@@ -1,0 +1,36 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesExplPackage
+  {xetex-stack-renderer}
+  {2026-08-28}
+  {0.1.0}
+  {Unicode-driven stack rendering framework for XeTeX}
+
+\RequirePackage{xsr-core}
+\RequirePackage{l3keys2e}
+
+\ExplSyntaxOn
+
+\keys_define:nn { xsr }
+  {
+    mode .choice:,
+    mode / auto .code:n = { \tl_gset:Nn \g_xsr_mode_tl { auto } },
+    mode / shell .code:n = { \tl_gset:Nn \g_xsr_mode_tl { shell } },
+    mode / preprocess .code:n =
+      { \tl_gset:Nn \g_xsr_mode_tl { preprocess } },
+    mode / stub .code:n = { \tl_gset:Nn \g_xsr_mode_tl { stub } },
+    mode .initial:n = auto,
+    renderer-command .tl_gset:N = \g_xsr_renderer_command_tl,
+    cache-dir .tl_gset:N = \g_xsr_cache_dir_tl,
+    trace .bool_gset:N = \g_xsr_trace_bool,
+    trace .initial:n = true,
+  }
+
+\ProcessKeysOptions { xsr }
+
+% Backends are loaded by the frontend, but their ranges and handlers are
+% registered through the generic core API.
+\RequirePackage{xsr-egyptian}
+
+\ExplSyntaxOff
+
+\endinput

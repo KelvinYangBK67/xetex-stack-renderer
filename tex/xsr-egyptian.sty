@@ -1,0 +1,24 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesExplPackage
+  {xsr-egyptian}
+  {2026-08-28}
+  {0.1.0}
+  {Egyptian backend registration for xetex-stack-renderer}
+
+\RequirePackage{xsr-core}
+
+\ExplSyntaxOn
+
+% Backend handler contract: (script name, complete Unicode run).
+\cs_new_protected:Npn \xsr_egyptian_render:nn #1#2
+  { \xsr_external_render:nn {#1} {#2} }
+
+\xsr_script_register:nnn
+  { egyptian }
+  { 13000-1342F, 13430-1345F, 13460-143FF }
+  { xsr_egyptian_render:nn }
+
+\ExplSyntaxOff
+
+\endinput
+

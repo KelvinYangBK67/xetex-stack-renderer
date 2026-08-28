@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.xsr-cache/
+*.aux
+*.log
+*.out
+*.pdf
+*.xsr-*.req
+*.xsr-*.tex
+*.xsr-manifest.json
+build/
+dist/
+*.egg-info/
+
