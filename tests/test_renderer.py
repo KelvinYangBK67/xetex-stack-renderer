@@ -46,8 +46,10 @@ def test_backend_parses_and_renders_one_complete_run(tmp_path: Path) -> None:
 
     tex = renderer.render('egyptian', run)
 
-    assert tex.startswith(r'\xsrBackendResult{egyptian}{3}')
+    assert tex.startswith(r'\xsrBackendLayoutResult{egyptian}{3}')
     assert f'{{{BACKEND_VERSION}}}{{hieropy-0.1.4}}' in tex
+    assert r'\xsrEgyptianLayout' in tex
+    assert tex.count(r'\xsrEgyptianGlyph') == 2
     assert len(list((tmp_path / 'cache').glob('*.tex'))) == 1
     assert renderer.render('egyptian', run) == tex
 
@@ -80,7 +82,7 @@ def test_render_request_protocol_is_bound_to_all_inputs(tmp_path: Path) -> None:
         ]
     ) == 0
     assert response.read_text(encoding='utf-8').startswith(
-        r'\xsrBackendResult{egyptian}{3}'
+        r'\xsrBackendLayoutResult{egyptian}{3}'
     )
 
 

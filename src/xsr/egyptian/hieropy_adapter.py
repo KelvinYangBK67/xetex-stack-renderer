@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .model import ParsedEgyptianRun
+from .model import ParsedEgyptianRun, RenderResult
 
 
 class EgyptianParseError(ValueError):
@@ -46,3 +46,9 @@ class HieropyAdapter:
             parser_version=self.parser_version,
             fragment=fragment,
         )
+
+    def layout(self, text: str) -> RenderResult:
+        '''Parse and lay out one run without leaking Hieropy objects.'''
+        from .layout import HieropyLayout
+
+        return HieropyLayout().layout(self.parse(text))

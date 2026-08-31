@@ -1,11 +1,12 @@
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesExplPackage
   {xsr-egyptian}
-  {2026-08-30}
-  {0.2.0}
+  {2026-08-31}
+  {0.3.0}
   {Egyptian backend registration for xetex-stack-renderer}
 
 \RequirePackage{xsr-core}
+\RequirePackage{graphicx}
 
 \ExplSyntaxOn
 
@@ -15,8 +16,68 @@
 
 \xsr_register_backend:nnn
   { egyptian }
-  { hieropy-0.1.4-parse-stub-1 }
+  { hieropy-0.1.4-basic-hv-layout-1 }
   { xsr_egyptian_render:nn }
+
+% XSR coordinates use em units, x to the right and y down from the top. The
+% first layout baseline is the canvas bottom. Each glyph is centered in the
+% cell Hieropy assigned to it, but is selected and shaped by the current XeTeX
+% font; no Hieropy font or raster output enters this layer.
+\dim_new:N \l_xsr_egyptian_layout_width_dim
+\dim_new:N \l_xsr_egyptian_layout_height_dim
+\dim_new:N \l_xsr_egyptian_layout_depth_dim
+
+\cs_new_protected:Npn \xsr_egyptian_glyph:nnnnnn #1#2#3#4#5#6
+  {
+    \rlap
+      {
+        \kern #2 em
+        \tex_raise:D
+          \dim_eval:n
+            { \l_xsr_egyptian_layout_height_dim - #3 em - #5 em }
+          \hbox:n
+            {
+              \vbox_to_ht:nn { #5 em }
+                {
+                  \vss
+                  \hbox_to_wd:nn { #4 em }
+                    {
+                      \hss
+                      \scalebox {#6}
+                        { \char_generate:nn { \int_from_hex:n {#1} } { 12 } }
+                      \hss
+                    }
+                  \vss
+                }
+            }
+      }
+  }
+
+\cs_new_protected:Npn \xsr_egyptian_layout:nnnnn #1#2#3#4#5
+  {
+    \group_begin:
+      \dim_set:Nn \l_xsr_egyptian_layout_width_dim { #1 em }
+      \dim_set:Nn \l_xsr_egyptian_layout_height_dim { #2 em }
+      \dim_set:Nn \l_xsr_egyptian_layout_depth_dim { #3 em }
+      \iow_term:x
+        { XSR-LAYOUT~script=egyptian~glyphs=#4~width=#1~height=#2~depth=#3 }
+      \mode_leave_vertical:
+      \hbox_to_wd:nn { \l_xsr_egyptian_layout_width_dim }
+        {
+          \tex_vrule:D
+            width~0pt
+            height~\l_xsr_egyptian_layout_height_dim
+            depth~\l_xsr_egyptian_layout_depth_dim
+          #5
+          \hss
+        }
+    \group_end:
+  }
+
+\NewDocumentCommand \xsrEgyptianGlyph { m m m m m m }
+  { \xsr_egyptian_glyph:nnnnnn {#1} {#2} {#3} {#4} {#5} {#6} }
+\NewDocumentCommand \xsrEgyptianLayout { m m m m m }
+  { \xsr_egyptian_layout:nnnnn {#1} {#2} {#3} {#4} {#5} }
 
 % The standalone frontend loads the active detector first. A host that omits
 % that detector gets no character redefinitions and can dispatch complete runs.

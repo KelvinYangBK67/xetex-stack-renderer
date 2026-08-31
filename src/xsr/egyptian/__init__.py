@@ -15,16 +15,26 @@ def register_script(registry: Registry) -> ScriptSpec:
     return registry.register('egyptian', EGYPTIAN_RANGES)
 
 
-from .backend import BACKEND_VERSION, EgyptianBackend  # noqa: E402
+from .backend import (  # noqa: E402
+    BACKEND_VERSION,
+    EgyptianBackend,
+    serialize_tex_layout,
+)
 from .hieropy_adapter import EgyptianParseError, HieropyAdapter  # noqa: E402
-from .model import ParsedEgyptianRun  # noqa: E402
+from .layout import EgyptianLayoutError, HieropyLayout  # noqa: E402
+from .model import GlyphPlacement, ParsedEgyptianRun, RenderResult  # noqa: E402
 
 __all__ = [
     'BACKEND_VERSION',
     'EGYPTIAN_RANGES',
     'EgyptianBackend',
+    'EgyptianLayoutError',
     'EgyptianParseError',
+    'GlyphPlacement',
     'HieropyAdapter',
+    'HieropyLayout',
     'ParsedEgyptianRun',
+    'RenderResult',
     'register_script',
+    'serialize_tex_layout',
 ]
