@@ -1,23 +1,23 @@
 [build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+requires = ['setuptools>=68']
+build-backend = 'setuptools.build_meta'
 
 [project]
-name = "xetex-stack-renderer"
-version = "0.1.0"
-description = "External renderer framework for Unicode-driven stacked scripts in XeTeX"
-readme = "README.md"
-requires-python = ">=3.10"
-license = { text = "MIT" }
-authors = [{ name = "xetex-stack-renderer contributors" }]
+name = 'xetex-stack-renderer'
+version = '0.2.0'
+description = 'External renderer framework for Unicode-driven stacked scripts in XeTeX'
+readme = 'README.md'
+requires-python = '>=3.10'
+license = { text = 'MIT' }
+authors = [{ name = 'xetex-stack-renderer contributors' }]
+dependencies = ['hieropy>=0.1.4,<0.1.5']
 
 [project.scripts]
-xsr-render = "xsr.renderer:main"
+xsr-render = 'xsr.renderer:main'
 
 [tool.pytest.ini_options]
-addopts = "-q"
-testpaths = ["tests"]
+addopts = '-q'
+testpaths = ['tests']
 
 [tool.setuptools.packages.find]
-where = ["src"]
-
+where = ['src']

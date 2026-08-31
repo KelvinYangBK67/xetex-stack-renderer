@@ -1,0 +1,25 @@
+import pytest
+
+from xsr.egyptian import EgyptianParseError, HieropyAdapter, ParsedEgyptianRun
+
+
+def test_valid_ehfc_is_parsed_by_hieropy() -> None:
+    text = chr(0x13000) + chr(0x13431) + chr(0x13050)
+
+    parsed = HieropyAdapter().parse(text)
+
+    assert isinstance(parsed, ParsedEgyptianRun)
+    assert parsed.text == text
+    assert parsed.parser_version == '0.1.4'
+    assert type(parsed.fragment).__name__ == 'Fragment'
+
+
+def test_invalid_ehfc_raises_xsr_parse_error() -> None:
+    text = chr(0x13000) + chr(0x13431)
+
+    with pytest.raises(EgyptianParseError) as caught:
+        HieropyAdapter().parse(text)
+
+    message = str(caught.value)
+    assert 'Unexpected end of input' in message
+    assert 'U+13000 U+13431' in message

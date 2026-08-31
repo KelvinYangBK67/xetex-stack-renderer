@@ -1,78 +1,152 @@
+import json
 from pathlib import Path
 
+import pytest
+
 from xsr.cache import RenderCache
-from xsr.egyptian import EgyptianBackend
-from xsr.renderer import Renderer, main, read_request
+from xsr.egyptian import BACKEND_VERSION, EgyptianBackend
+from xsr.renderer import (
+    RenderRequest,
+    Renderer,
+    canonical_options,
+    main,
+    read_request,
+    request_digest,
+)
 
 
-def test_backend_receives_and_renders_a_complete_run(tmp_path: Path) -> None:
-    renderer = Renderer(RenderCache(tmp_path / "cache"))
+def ehfc_run() -> str:
+    return chr(0x13000) + chr(0x13431) + chr(0x13050)
+
+
+def write_request(path: Path, text: str) -> str:
+    digest = request_digest('egyptian', BACKEND_VERSION, text, {})
+    codepoints = ','.join(f'{ord(character):X}' for character in text)
+    path.write_text(
+        '\n'.join(
+            [
+                'XSR2',
+                f'digest={digest}',
+                'script=egyptian',
+                f'backend_version={BACKEND_VERSION}',
+                f'options={canonical_options({})}',
+                f'codepoints={codepoints}',
+                '',
+            ]
+        ),
+        encoding='utf-8',
+    )
+    return digest
+
+
+def test_backend_parses_and_renders_one_complete_run(tmp_path: Path) -> None:
+    renderer = Renderer(RenderCache(tmp_path / 'cache'))
     renderer.register(EgyptianBackend())
-    run = chr(0x13000) + chr(0x13430) + chr(0x13460)
+    run = ehfc_run()
 
-    tex = renderer.render("egyptian", run)
+    tex = renderer.render('egyptian', run)
 
-    assert tex.startswith(r"\xsrBackendResult{egyptian}{3}")
-    assert len(list((tmp_path / "cache").glob("*.tex"))) == 1
-    assert renderer.render("egyptian", run) == tex
+    assert tex.startswith(r'\xsrBackendResult{egyptian}{3}')
+    assert f'{{{BACKEND_VERSION}}}{{hieropy-0.1.4}}' in tex
+    assert len(list((tmp_path / 'cache').glob('*.tex'))) == 1
+    assert renderer.render('egyptian', run) == tex
 
 
-def test_render_request_protocol(tmp_path: Path) -> None:
-    request = tmp_path / "run.req"
-    response = tmp_path / "run.tex"
-    request.write_text(
-        "XSR1\nscript=egyptian\ncodepoints=13000 13430 13460\n",
-        encoding="utf-8",
+def test_render_request_protocol_is_bound_to_all_inputs(tmp_path: Path) -> None:
+    run = ehfc_run()
+    request_path = tmp_path / 'run.req'
+    digest = write_request(request_path, run)
+    response = tmp_path / f'run.xsr-{digest}.tex'
+
+    request = read_request(request_path)
+    assert request == RenderRequest(
+        digest=digest,
+        script='egyptian',
+        backend_version=BACKEND_VERSION,
+        options={},
+        text=run,
+    )
+    assert main(
+        [
+            'render',
+            '--backend',
+            'egyptian',
+            '--input',
+            str(request_path),
+            '--output',
+            str(response),
+            '--cache-dir',
+            str(tmp_path / 'cache'),
+        ]
+    ) == 0
+    assert response.read_text(encoding='utf-8').startswith(
+        r'\xsrBackendResult{egyptian}{3}'
     )
 
-    assert read_request(request) == (
-        "egyptian",
-        chr(0x13000) + chr(0x13430) + chr(0x13460),
+
+def test_preprocess_writes_content_addressed_response_and_manifest(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / 'sample.tex'
+    source.write_text(f'ordinary {ehfc_run()} ordinary\n', encoding='utf-8')
+    output = tmp_path / 'prepared'
+
+    assert main(
+        [
+            'preprocess',
+            '--input',
+            str(source),
+            '--output-dir',
+            str(output),
+        ]
+    ) == 0
+
+    manifest = json.loads(
+        (output / 'sample.xsr-manifest.json').read_text(encoding='utf-8')
     )
-    assert (
-        main(
-            [
-                "render",
-                "--backend",
-                "egyptian",
-                "--input",
-                str(request),
-                "--output",
-                str(response),
-                "--cache-dir",
-                str(tmp_path / "cache"),
-            ]
-        )
-        == 0
-    )
-    assert response.read_text(encoding="utf-8").startswith(
-        r"\xsrBackendResult{egyptian}{3}"
-    )
+    run = manifest['runs'][0]
+    assert manifest['format'] == 'XSR-PREPROCESS-2'
+    assert run['script'] == 'egyptian'
+    assert run['backend_version'] == BACKEND_VERSION
+    assert run['options'] == {}
+    assert run['digest'] in run['response']
+    assert (output / run['response']).is_file()
 
 
-def test_preprocess_writes_numbered_responses_and_manifest(tmp_path: Path) -> None:
-    source = tmp_path / "sample.tex"
-    run = chr(0x13000) + chr(0x13430)
-    source.write_text(f"ordinary {run} ordinary\n", encoding="utf-8")
-    output = tmp_path / "prepared"
+def test_changed_run_cannot_reuse_same_numbered_response(tmp_path: Path) -> None:
+    source = tmp_path / 'sample.tex'
+    output = tmp_path / 'prepared'
 
-    assert (
-        main(
-            [
-                "preprocess",
-                "--input",
-                str(source),
-                "--output-dir",
-                str(output),
-            ]
-        )
-        == 0
+    source.write_text(f'ordinary {chr(0x13000)} ordinary\n', encoding='utf-8')
+    assert main(
+        ['preprocess', '--input', str(source), '--output-dir', str(output)]
+    ) == 0
+    first_manifest = json.loads(
+        (output / 'sample.xsr-manifest.json').read_text(encoding='utf-8')
+    )
+    first_response = first_manifest['runs'][0]['response']
+
+    source.write_text(f'ordinary {chr(0x13001)} ordinary\n', encoding='utf-8')
+    assert main(
+        ['preprocess', '--input', str(source), '--output-dir', str(output)]
+    ) == 0
+    second_manifest = json.loads(
+        (output / 'sample.xsr-manifest.json').read_text(encoding='utf-8')
+    )
+    second_response = second_manifest['runs'][0]['response']
+
+    assert first_response != second_response
+    assert (output / first_response).is_file()
+    assert (output / second_response).is_file()
+
+
+def test_request_digest_rejects_changed_codepoints(tmp_path: Path) -> None:
+    request_path = tmp_path / 'run.req'
+    write_request(request_path, chr(0x13000))
+    request_path.write_text(
+        request_path.read_text(encoding='utf-8').replace('13000', '13001'),
+        encoding='utf-8',
     )
 
-    response = output / "sample.xsr-1.tex"
-    manifest = output / "sample.xsr-manifest.json"
-    assert response.read_text(encoding="utf-8").startswith(
-        r"\xsrBackendResult{egyptian}{2}"
-    )
-    assert '"script": "egyptian"' in manifest.read_text(encoding="utf-8")
-
+    with pytest.raises(ValueError, match='request digest mismatch'):
+        read_request(request_path)

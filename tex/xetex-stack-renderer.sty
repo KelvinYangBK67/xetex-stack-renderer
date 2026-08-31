@@ -1,8 +1,8 @@
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesExplPackage
   {xetex-stack-renderer}
-  {2026-08-28}
-  {0.1.0}
+  {2026-08-30}
+  {0.2.0}
   {Unicode-driven stack rendering framework for XeTeX}
 
 \RequirePackage{xsr-core}
@@ -27,8 +27,9 @@
 
 \ProcessKeysOptions { xsr }
 
-% Backends are loaded by the frontend, but their ranges and handlers are
-% registered through the generic core API.
+% Standalone usage enables the replaceable active detector. Hosts may instead
+% load xsr-core plus a backend and call \xsr_dispatch_run:nn directly.
+\RequirePackage{xsr-detector-active}
 \RequirePackage{xsr-egyptian}
 
 \ExplSyntaxOff

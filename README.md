@@ -1,41 +1,36 @@
 # xetex-stack-renderer
 
-`xetex-stack-renderer` 是一個 XeTeX/XeLaTeX 的 Unicode-driven stack rendering
-framework。正文只需直接輸入 Unicode；frontend 會按已註冊的 Unicode range 找出完整
-script run，再把整個 run 交給 backend。Egyptian Hieroglyphs 是第一個 backend，目前
-只輸出可觀察的 stub，尚未實作 EHFC/Hieropy layout。
+`xetex-stack-renderer` 是 XeTeX/XeLaTeX 的 Unicode-driven stack rendering framework。使用者只需載入套件，正文直接輸入 Unicode；standalone detector 會找出完整 script run，再交給已註冊的 backend。
 
 ```tex
 \usepackage{xetex-stack-renderer}
 ```
 
-## 分層
+Egyptian Hieroglyphs 是第一個 backend。目前已經透過 Hieropy 解析 Unicode/EHFC run，但輸出仍是可觀察 dispatch 成功的 stub，尚未實作 glyph layout。
 
-- `tex/xetex-stack-renderer.sty`：LaTeX frontend、選項與 backend 載入。
-- `tex/xsr-core.sty`：XeTeX range/class registry、active run collector、dispatch，
-  以及 external renderer/cache bridge。
-- `tex/xsr-egyptian.sty`：Egyptian ranges 與 TeX-side backend handler。
-- `src/xsr/registry.py`：Python-side generic Unicode run detection。
-- `src/xsr/renderer.py`、`cache.py`：backend protocol、CLI 與 content-addressed cache。
-- `src/xsr/egyptian/backend.py`：Egyptian placeholder backend。
+## 架構
 
-預設 `mode=auto`：若已有預處理 response 就直接讀取；否則在 unrestricted
-`shell-escape` 下呼叫 Python；兩者皆不可用時顯示 TeX stub。因此文件本身仍只需要
-一行 `\usepackage{xetex-stack-renderer}`。
+- `tex/xetex-stack-renderer.sty`：零 markup 的 LaTeX frontend，組合 detector 與 backend。
+- `tex/xsr-core.sty`：通用 backend registry、完整 run dispatch API、外部 renderer 與 response interface；不負責偵測，也不寫死 Egyptian 邏輯。
+- `tex/xsr-detector-active.sty`：standalone active-character detector。未來的 host/template 可不載入此模組，直接呼叫 `\xsr_dispatch_run:nn`。
+- `tex/xsr-egyptian.sty`：註冊 Egyptian ranges、backend version 與 TeX-side handler。
+- `src/xsr/registry.py`：Python-side script/range registry 與完整 Unicode run detection。
+- `src/xsr/renderer.py`、`cache.py`：CLI、外部 renderer protocol、預處理模式與 content-addressed cache。
+- `src/xsr/egyptian/hieropy_adapter.py`：隔離 Hieropy API，將 Unicode/EHFC run 解析成不透明的中間結果，並把 parser error 轉成 `EgyptianParseError`。
+- `src/xsr/egyptian/backend.py`：先解析完整 run，再產生 stub TeX response。
+
+每個 external-renderer request 的 identity 綁定 script、Unicode codepoints、backend version 與 renderer options。TeX response 以 request digest 命名，因此同一 run 編號的內容改變時不會誤讀舊 response。
 
 ## 安裝與測試
-
-先安裝 Python package，再讓 TeX 找到 `tex/`（正式安裝時也可把三個 `.sty` 複製到
-個人 TEXMF tree）：
 
 ```powershell
 python -m pip install -e .
 $env:TEXINPUTS = "$PWD\tex;$env:TEXINPUTS"
-python -m pytest
+python -m pytest -q
 xelatex -shell-escape examples/minimal.tex
 ```
 
-不使用 `shell-escape` 時，可先產生 response；`auto` mode 會讀取它們：
+預處理模式可先產生 content-addressed response，再於禁用 shell escape 時編譯：
 
 ```powershell
 python -m xsr.renderer preprocess --input examples/minimal.tex --output-dir .
@@ -44,9 +39,7 @@ xelatex examples/minimal.tex
 
 ## 當前限制
 
-- Egyptian backend 只證明完整 run 已成功 dispatch；尚無 EHFC、Hieropy、字形定位或
-  真正的 stack layout。
-- TeX frontend 會把已註冊 range 設為 active collectors；若其他 package 重新定義同一
-  range 的 catcode 或 active character meaning，兩者目前尚無協調機制。
-- 最小 preprocessor 以 Unicode ranges 掃描原始 `.tex`，尚不理解 TeX comments、macro
-  expansion 或 `\input` 圖；manifest 已保留來源 hash，後續可據此加入嚴格驗證。
+- Egyptian backend 只驗證完整 run 能由 Hieropy 成功解析；尚未實作 glyph positioning、boxes、scaling、overlay、mirror 或 damage rendering。
+- standalone detector 仍會將已註冊 range 設為 active；需要避免此全局字符行為的 host 應只載入 core/backend，並自行提交完整 run。
+- 最小 preprocessor 只掃描原始 `.tex` 的 Unicode ranges，不理解 macro expansion、`\input` 或完整 TeX 語法。
+- 不支援 HieroTeX compatibility。

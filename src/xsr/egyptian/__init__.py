@@ -1,4 +1,4 @@
-"""Egyptian script registration."""
+'''Egyptian script registration and backend exports.'''
 
 from __future__ import annotations
 
@@ -12,10 +12,19 @@ EGYPTIAN_RANGES = (
 
 
 def register_script(registry: Registry) -> ScriptSpec:
-    return registry.register("egyptian", EGYPTIAN_RANGES)
+    return registry.register('egyptian', EGYPTIAN_RANGES)
 
 
-from .backend import EgyptianBackend  # noqa: E402
+from .backend import BACKEND_VERSION, EgyptianBackend  # noqa: E402
+from .hieropy_adapter import EgyptianParseError, HieropyAdapter  # noqa: E402
+from .model import ParsedEgyptianRun  # noqa: E402
 
-__all__ = ["EGYPTIAN_RANGES", "EgyptianBackend", "register_script"]
-
+__all__ = [
+    'BACKEND_VERSION',
+    'EGYPTIAN_RANGES',
+    'EgyptianBackend',
+    'EgyptianParseError',
+    'HieropyAdapter',
+    'ParsedEgyptianRun',
+    'register_script',
+]

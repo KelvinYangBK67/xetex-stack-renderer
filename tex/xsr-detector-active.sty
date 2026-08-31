@@ -1,0 +1,121 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesExplPackage
+  {xsr-detector-active}
+  {2026-08-30}
+  {0.2.0}
+  {Standalone active-character run detector for xetex-stack-renderer}
+
+\RequirePackage{xsr-core}
+
+\ExplSyntaxOn
+
+\msg_new:nnn { xsr-detector-active } { duplicate-script }
+  { Script~'#1'~has~already~been~registered~with~the~active~detector. }
+
+\prop_new:N \g_xsr_active_detector_script_prop
+\seq_new:N \l_xsr_active_detector_range_parts_seq
+\int_new:N \l_xsr_active_detector_range_start_int
+\int_new:N \l_xsr_active_detector_range_end_int
+\tl_new:N \l_xsr_active_detector_script_tl
+\tl_new:N \l_xsr_active_detector_run_tl
+\tl_new:N \l_xsr_active_detector_flush_script_tl
+\tl_new:N \l_xsr_active_detector_flush_run_tl
+\tl_new:N \l_xsr_active_detector_next_meaning_tl
+
+\cs_new_protected:Npn \xsr_active_detector_marker: { }
+\tl_const:Nx \c_xsr_active_detector_marker_tl
+  { \token_to_str:N \xsr_active_detector_marker: }
+
+\cs_new_protected:Npn \xsr_active_detector_define_char:nn #1#2
+  {
+    \cs_gset_protected:cpx { g_xsr_active_detector_#2: }
+      {
+        \exp_not:N \xsr_active_detector_marker:
+        \exp_not:N \xsr_active_detector_collect:nn
+          {#1}
+          { \char_generate:nn {#2} { 12 } }
+      }
+    \char_gset_active_eq:nc {#2} { g_xsr_active_detector_#2: }
+  }
+
+\cs_new_protected:Npn \xsr_active_detector_assign_range:nn #1#2
+  {
+    \seq_set_split:Nnn \l_xsr_active_detector_range_parts_seq { - } {#2}
+    \int_set:Nn \l_xsr_active_detector_range_start_int
+      {
+        \exp_args:Ne \int_from_hex:n
+          { \seq_item:Nn \l_xsr_active_detector_range_parts_seq { 1 } }
+      }
+    \int_set:Nn \l_xsr_active_detector_range_end_int
+      {
+        \exp_args:Ne \int_from_hex:n
+          { \seq_item:Nn \l_xsr_active_detector_range_parts_seq { 2 } }
+      }
+    \int_step_inline:nnn
+      { \l_xsr_active_detector_range_start_int }
+      { \l_xsr_active_detector_range_end_int }
+      {
+        \char_set_catcode_active:n {##1}
+        \exp_args:Nee \xsr_active_detector_define_char:nn {#1} {##1}
+      }
+  }
+
+% Detector registration API: script name and inclusive hexadecimal ranges.
+\cs_new_protected:Npn \xsr_active_detector_register:nn #1#2
+  {
+    \prop_if_in:NnTF \g_xsr_active_detector_script_prop {#1}
+      { \msg_error:nnn { xsr-detector-active } { duplicate-script } {#1} }
+      {
+        \prop_gput:Nnn \g_xsr_active_detector_script_prop {#1} {#2}
+        \clist_map_inline:nn {#2}
+          { \xsr_active_detector_assign_range:nn {#1} {##1} }
+      }
+  }
+
+\cs_new_protected:Npn \xsr_active_detector_flush:
+  {
+    \tl_if_empty:NF \l_xsr_active_detector_run_tl
+      {
+        \tl_set_eq:NN
+          \l_xsr_active_detector_flush_script_tl
+          \l_xsr_active_detector_script_tl
+        \tl_set_eq:NN
+          \l_xsr_active_detector_flush_run_tl
+          \l_xsr_active_detector_run_tl
+        \tl_clear:N \l_xsr_active_detector_script_tl
+        \tl_clear:N \l_xsr_active_detector_run_tl
+        \exp_args:NVV \xsr_dispatch_run:nn
+          \l_xsr_active_detector_flush_script_tl
+          \l_xsr_active_detector_flush_run_tl
+      }
+  }
+
+\cs_new_protected:Npn \xsr_active_detector_maybe_flush:
+  {
+    \tl_set:Nx \l_xsr_active_detector_next_meaning_tl
+      { \token_to_meaning:N \l_peek_token }
+    \exp_args:NVV \tl_if_in:nnTF
+      \l_xsr_active_detector_next_meaning_tl
+      \c_xsr_active_detector_marker_tl
+      { }
+      { \xsr_active_detector_flush: }
+  }
+
+\cs_new_protected:Npn \xsr_active_detector_collect:nn #1#2
+  {
+    \tl_if_empty:NTF \l_xsr_active_detector_run_tl
+      { \tl_set:Nn \l_xsr_active_detector_script_tl {#1} }
+      {
+        \str_if_eq:VnF \l_xsr_active_detector_script_tl {#1}
+          {
+            \xsr_active_detector_flush:
+            \tl_set:Nn \l_xsr_active_detector_script_tl {#1}
+          }
+      }
+    \tl_put_right:Nn \l_xsr_active_detector_run_tl {#2}
+    \peek_after:Nw \xsr_active_detector_maybe_flush:
+  }
+
+\ExplSyntaxOff
+
+\endinput

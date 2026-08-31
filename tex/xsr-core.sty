@@ -1,9 +1,9 @@
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesExplPackage
   {xsr-core}
-  {2026-08-28}
-  {0.1.0}
-  {Core registry and run dispatcher for xetex-stack-renderer}
+  {2026-08-30}
+  {0.2.0}
+  {Core run dispatcher for xetex-stack-renderer}
 
 \RequirePackage{expl3}
 
@@ -11,129 +11,55 @@
 
 \msg_new:nnn { xsr } { xetex-required }
   { xetex-stack-renderer~requires~XeTeX/XeLaTeX. }
-\msg_new:nnn { xsr } { duplicate-script }
-  { Script~'#1'~has~already~been~registered. }
-\msg_new:nnn { xsr } { missing-handler }
-  { No~handler~is~registered~for~script~'#1'. }
+\msg_new:nnn { xsr } { duplicate-backend }
+  { Backend~'#1'~has~already~been~registered. }
+\msg_new:nnn { xsr } { missing-backend }
+  { No~backend~is~registered~for~script~'#1'. }
 \msg_new:nnn { xsr } { external-failed }
-  { External~renderer~did~not~produce~'#1';~using~the~TeX~stub. }
+  {
+    External~renderer~failed~for~request~'#1'.
+    Check~the~Python~error~above;~the~run~was~not~rendered.
+  }
 \msg_new:nnn { xsr } { preprocess-missing }
-  { Preprocessed~response~'#1'~is~missing;~using~the~TeX~stub. }
+  { Content-addressed~response~'#1'~is~missing;~using~the~unavailable~stub. }
 \msg_new:nnn { xsr } { shell-disabled }
-  { Unrestricted~shell~escape~is~disabled;~using~the~TeX~stub. }
+  { Unrestricted~shell~escape~is~disabled;~using~the~unavailable~stub. }
 
 \sys_if_engine_xetex:F { \msg_fatal:nn { xsr } { xetex-required } }
 
-% Frontend configuration.  The public package owns the option syntax; the
-% core only consumes these values.
+% Frontend configuration. Renderer options are canonical JSON and are part
+% of every request identity, even though v0.2 currently exposes no options.
 \tl_new:N \g_xsr_mode_tl
 \tl_new:N \g_xsr_renderer_command_tl
 \tl_new:N \g_xsr_cache_dir_tl
+\tl_new:N \g_xsr_renderer_options_tl
 \bool_new:N \g_xsr_trace_bool
 \tl_gset:Nn \g_xsr_mode_tl { auto }
 \tl_gset:Nn \g_xsr_renderer_command_tl { python~-m~xsr.renderer }
 \tl_gset:Nn \g_xsr_cache_dir_tl { .xsr-cache }
+\tl_gset:Nx \g_xsr_renderer_options_tl
+  { \c_left_brace_str \c_right_brace_str }
 \bool_gset_true:N \g_xsr_trace_bool
 
-% Script/range registry.
-\prop_new:N \g_xsr_script_class_prop
-\prop_new:N \g_xsr_script_handler_prop
-\seq_new:N \g_xsr_script_seq
-\seq_new:N \l_xsr_range_parts_seq
-\int_new:N \l_xsr_range_start_int
-\int_new:N \l_xsr_range_end_int
-\tl_new:N \l_xsr_class_tl
-\tl_new:N \l_xsr_active_script_tl
-\tl_new:N \l_xsr_active_run_tl
+% Generic backend registry. Detection is deliberately not part of core.
+\prop_new:N \g_xsr_backend_handler_prop
+\prop_new:N \g_xsr_backend_version_prop
 
-\group_begin:
-  \char_set_catcode_active:n { 0 }
-  \cs_gset_protected:Npn \xsr_peek_active:TF
-    { \peek_catcode:NTF ^^@ }
-\group_end:
-
-\cs_new_protected:Npn \xsr_define_active:nn #1#2
+% #1 script name; #2 backend version; #3 handler name without a backslash.
+\cs_new_protected:Npn \xsr_register_backend:nnn #1#2#3
   {
-    \cs_gset_protected:cpx { g_xsr_active_#2: }
+    \prop_if_in:NnTF \g_xsr_backend_handler_prop {#1}
+      { \msg_error:nnn { xsr } { duplicate-backend } {#1} }
       {
-        \exp_not:N \xsr_active_char:nn
-          {#1}
-          { \char_generate:nn {#2} { 12 } }
-      }
-    \char_gset_active_eq:nc {#2} { g_xsr_active_#2: }
-  }
-
-\cs_new_protected:Npn \xsr_assign_range:nnn #1#2#3
-  {
-    \seq_set_split:Nnn \l_xsr_range_parts_seq { - } {#2}
-    \int_set:Nn \l_xsr_range_start_int
-      { "\seq_item:Nn \l_xsr_range_parts_seq { 1 } }
-    \int_set:Nn \l_xsr_range_end_int
-      { "\seq_item:Nn \l_xsr_range_parts_seq { 2 } }
-    \int_step_inline:nnn
-      { \l_xsr_range_start_int }
-      { \l_xsr_range_end_int }
-      {
-        \XeTeXcharclass ##1 = #1\scan_stop:
-        \char_set_catcode_active:n {##1}
-        \exp_args:Nee \xsr_define_active:nn
-          {#3}
-          {##1}
+        \prop_gput:Nnn \g_xsr_backend_handler_prop {#1} {#3}
+        \prop_gput:Nnn \g_xsr_backend_version_prop {#1} {#2}
       }
   }
 
-% #1 script name; #2 comma-separated inclusive hexadecimal ranges;
-% #3 backend handler control-sequence name (without a leading backslash).
-\cs_new_protected:Npn \xsr_script_register:nnn #1#2#3
+% Stable host/detector API: dispatch exactly one complete Unicode run.
+\cs_new_protected:Npn \xsr_dispatch_run:nn #1#2
   {
-    \prop_if_in:NnTF \g_xsr_script_class_prop {#1}
-      { \msg_error:nnn { xsr } { duplicate-script } {#1} }
-      {
-        \exp_args:Nc \newXeTeXintercharclass { g_xsr_#1_class }
-        \tl_set:Nx \l_xsr_class_tl
-          { \int_to_arabic:n { \use:c { g_xsr_#1_class } } }
-        \prop_gput:NnV \g_xsr_script_class_prop {#1} \l_xsr_class_tl
-        \prop_gput:Nnn \g_xsr_script_handler_prop {#1} {#3}
-        \clist_map_inline:nn {#2}
-          { \xsr_assign_range:nnn { \l_xsr_class_tl } {##1} {#1} }
-        \seq_gput_right:Nn \g_xsr_script_seq {#1}
-      }
-  }
-
-% Run detection.  Registered Unicode characters are active collectors, but
-% dispatch happens only once at the end of an adjacent active-character span
-% (or when the registered script changes).
-\cs_new_protected:Npn \xsr_active_flush:
-  {
-    \tl_if_empty:NF \l_xsr_active_run_tl
-      {
-        \exp_args:NVV \xsr_dispatch:nn
-          \l_xsr_active_script_tl \l_xsr_active_run_tl
-        \tl_clear:N \l_xsr_active_script_tl
-        \tl_clear:N \l_xsr_active_run_tl
-      }
-  }
-
-\cs_new_protected:Npn \xsr_active_char:nn #1#2
-  {
-    \tl_if_empty:NTF \l_xsr_active_run_tl
-      { \tl_set:Nn \l_xsr_active_script_tl {#1} }
-      {
-        \str_if_eq:VnF \l_xsr_active_script_tl {#1}
-          {
-            \xsr_active_flush:
-            \tl_set:Nn \l_xsr_active_script_tl {#1}
-          }
-      }
-    \tl_put_right:Nn \l_xsr_active_run_tl {#2}
-    \xsr_peek_active:TF
-      { }
-      { \xsr_active_flush: }
-  }
-
-\cs_new_protected:Npn \xsr_dispatch:nn #1#2
-  {
-    \prop_get:NnNTF \g_xsr_script_handler_prop {#1} \l_tmpa_tl
+    \prop_get:NnNTF \g_xsr_backend_handler_prop {#1} \l_tmpa_tl
       {
         \bool_if:NT \g_xsr_trace_bool
           {
@@ -142,67 +68,95 @@
           }
         \use:c { \l_tmpa_tl } {#1} {#2}
       }
-      { \msg_error:nnn { xsr } { missing-handler } {#1} }
+      { \msg_error:nnn { xsr } { missing-backend } {#1} }
   }
 
-% External renderer and cache bridge.
-\int_new:N \g_xsr_run_int
+% Content-addressed external-renderer bridge.
 \iow_new:N \g_xsr_request_iow
 \seq_new:N \l_xsr_codepoints_seq
+\tl_new:N \l_xsr_backend_version_tl
+\tl_new:N \l_xsr_codepoints_tl
+\tl_new:N \l_xsr_signature_tl
+\tl_new:N \l_xsr_request_digest_tl
 \tl_new:N \l_xsr_request_file_tl
 \tl_new:N \l_xsr_response_file_tl
 
-\cs_new_protected:Npn \xsr_write_request:nn #1#2
+\cs_new_protected:Npn \xsr_prepare_request:nn #1#2
   {
+    \prop_get:NnN
+      \g_xsr_backend_version_prop {#1} \l_xsr_backend_version_tl
     \seq_clear:N \l_xsr_codepoints_seq
     \tl_map_inline:nn {#2}
       {
         \seq_put_right:Nx \l_xsr_codepoints_seq
           { \int_to_Hex:n { `##1 } }
       }
+    \tl_set:Nx \l_xsr_codepoints_tl
+      { \seq_use:Nn \l_xsr_codepoints_seq { , } }
+    \tl_set:Nx \l_xsr_signature_tl
+      {
+        XSR2|script=#1|backend_version=\l_xsr_backend_version_tl
+        |options=\g_xsr_renderer_options_tl
+        |codepoints=\l_xsr_codepoints_tl
+      }
+    \tl_set:Nx \l_xsr_request_digest_tl
+      { \str_mdfive_hash:e { \l_xsr_signature_tl } }
+    \tl_set:Nx \l_xsr_request_file_tl
+      { \c_sys_jobname_str .xsr-\l_xsr_request_digest_tl .req }
+    \tl_set:Nx \l_xsr_response_file_tl
+      { \c_sys_jobname_str .xsr-\l_xsr_request_digest_tl .tex }
+  }
+
+\cs_new_protected:Npn \xsr_write_request:n #1
+  {
     \iow_open:NV \g_xsr_request_iow \l_xsr_request_file_tl
-    \iow_now:Nn \g_xsr_request_iow { XSR1 }
+    \iow_now:Nn \g_xsr_request_iow { XSR2 }
+    \iow_now:Nx \g_xsr_request_iow
+      { digest=\l_xsr_request_digest_tl }
     \iow_now:Nx \g_xsr_request_iow { script=#1 }
     \iow_now:Nx \g_xsr_request_iow
-      { codepoints=\seq_use:Nn \l_xsr_codepoints_seq { ~ } }
+      { backend_version=\l_xsr_backend_version_tl }
+    \iow_now:Nx \g_xsr_request_iow
+      { options=\g_xsr_renderer_options_tl }
+    \iow_now:Nx \g_xsr_request_iow
+      { codepoints=\l_xsr_codepoints_tl }
     \iow_close:N \g_xsr_request_iow
   }
 
 \cs_new_protected:Npn \xsr_input_response:
   { \exp_args:NV \file_input:n \l_xsr_response_file_tl }
 
-\cs_new_protected:Npn \xsr_tex_stub:nn #1#2
+\cs_new_protected:Npn \xsr_unavailable_stub:nn #1#2
   {
-    \xsr_backend_result:nnn
-      {#1}
-      { \int_eval:n { \tl_count:n {#2} } }
-      { tex-fallback }
+    \iow_term:x
+      { XSR-UNAVAILABLE~script=#1~codepoints=\int_eval:n { \tl_count:n {#2} } }
+    \mbox{\fbox{\ttfamily XSR~#1~renderer~unavailable}}
   }
 
 \cs_new_protected:Npn \xsr_shell_render:nn #1#2
   {
     \sys_if_shell_unrestricted:TF
       {
-        \xsr_write_request:nn {#1} {#2}
+        \xsr_write_request:n {#1}
         \sys_shell_now:x
           {
             \g_xsr_renderer_command_tl \c_space_tl render
             \c_space_tl --backend \c_space_tl #1
-            \c_space_tl --input \c_space_tl "\l_xsr_request_file_tl"
-            \c_space_tl --output \c_space_tl "\l_xsr_response_file_tl"
-            \c_space_tl --cache-dir \c_space_tl "\g_xsr_cache_dir_tl"
+            \c_space_tl --input \c_space_tl \l_xsr_request_file_tl
+            \c_space_tl --output \c_space_tl \l_xsr_response_file_tl
+            \c_space_tl --cache-dir \c_space_tl \g_xsr_cache_dir_tl
           }
         \file_if_exist:VTF \l_xsr_response_file_tl
           { \xsr_input_response: }
           {
-            \msg_warning:nnx { xsr } { external-failed }
-              { \l_xsr_response_file_tl }
-            \xsr_tex_stub:nn {#1} {#2}
+            \msg_error:nnx { xsr } { external-failed }
+              { \l_xsr_request_digest_tl }
+            \xsr_unavailable_stub:nn {#1} {#2}
           }
       }
       {
         \msg_warning:nn { xsr } { shell-disabled }
-        \xsr_tex_stub:nn {#1} {#2}
+        \xsr_unavailable_stub:nn {#1} {#2}
       }
   }
 
@@ -213,24 +167,19 @@
       {
         \msg_warning:nnx { xsr } { preprocess-missing }
           { \l_xsr_response_file_tl }
-        \xsr_tex_stub:nn {#1} {#2}
+        \xsr_unavailable_stub:nn {#1} {#2}
       }
   }
 
-% Backend-facing interface.  A backend receives (script name, complete run)
-% and normally delegates here; a future in-process backend may choose not to.
+% Backend-facing interface: receive one complete run and select invocation mode.
 \cs_new_protected:Npn \xsr_external_render:nn #1#2
   {
-    \int_gincr:N \g_xsr_run_int
-    \tl_set:Nx \l_xsr_request_file_tl
-      { \c_sys_jobname_str .xsr-\int_use:N \g_xsr_run_int .req }
-    \tl_set:Nx \l_xsr_response_file_tl
-      { \c_sys_jobname_str .xsr-\int_use:N \g_xsr_run_int .tex }
+    \xsr_prepare_request:nn {#1} {#2}
     \str_case:VnF \g_xsr_mode_tl
       {
         { shell }     { \xsr_shell_render:nn {#1} {#2} }
         { preprocess }{ \xsr_preprocessed_or_stub:nn {#1} {#2} }
-        { stub }      { \xsr_tex_stub:nn {#1} {#2} }
+        { stub }      { \xsr_unavailable_stub:nn {#1} {#2} }
         { auto }
           {
             \file_if_exist:VTF \l_xsr_response_file_tl
@@ -238,17 +187,21 @@
               { \xsr_shell_render:nn {#1} {#2} }
           }
       }
-      { \xsr_tex_stub:nn {#1} {#2} }
+      { \xsr_unavailable_stub:nn {#1} {#2} }
   }
 
-% Stable TeX response command emitted by Python backends.
-\cs_new_protected:Npn \xsr_backend_result:nnn #1#2#3
+% Stable response command emitted by successful Python backends.
+\cs_new_protected:Npn \xsr_backend_result:nnnnn #1#2#3#4#5
   {
-    \iow_term:x { XSR-BACKEND~script=#1~codepoints=#2~digest=#3 }
-    \mbox{\fbox{\ttfamily XSR~#1~stub:~#2~codepoints}}
+    \iow_term:x
+      {
+        XSR-BACKEND~script=#1~codepoints=#2~digest=#3
+        ~backend-version=#4~parser=#5
+      }
+    \mbox{\fbox{\ttfamily XSR~#1~parsed~stub:~#2~codepoints}}
   }
-\NewDocumentCommand \xsrBackendResult { m m m }
-  { \xsr_backend_result:nnn {#1} {#2} {#3} }
+\NewDocumentCommand \xsrBackendResult { m m m m m }
+  { \xsr_backend_result:nnnnn {#1} {#2} {#3} {#4} {#5} }
 
 \ExplSyntaxOff
 
