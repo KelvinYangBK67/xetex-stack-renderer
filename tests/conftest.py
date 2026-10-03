@@ -7,11 +7,13 @@ import os
 from pathlib import Path
 import hieropy
 import pytest
-from xsr.font_metrics import load_font, tex_font_path
+from xsr.font_metrics import load_font, tex_font_path, font_options as make_options
 
 ROOT = Path(__file__).resolve().parents[1]
 NEW_GARDINER = Path(hieropy.__file__).parent / 'resources/NewGardiner.ttf'
 NOTO = Path(os.environ.get('XSR_NOTO_FONT', ROOT / 'tmp/fonts/NotoSansEgyptianHieroglyphs-Regular.ttf'))
+if os.environ.get('XSR_REQUIRE_REFERENCE_FONTS') and not NOTO.is_file():
+    raise RuntimeError('CI requires the downloaded Noto reference font')
 FONTS = [NEW_GARDINER]
 if NOTO.is_file():
     FONTS.append(NOTO)
@@ -26,4 +28,4 @@ def font(request):
 @pytest.fixture
 def font_options():
     profile = load_font(NEW_GARDINER)
-    return {'font_path': tex_font_path(profile.path), 'font_digest': profile.digest}
+    return make_options(profile.path)

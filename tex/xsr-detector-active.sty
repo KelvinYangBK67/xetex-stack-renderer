@@ -2,7 +2,7 @@
 \ProvidesExplPackage
   {xsr-detector-active}
   {2026-10-03}
-  {0.4.0}
+  {0.5}
   {Standalone active-character run detector for xetex-stack-renderer}
 
 \RequirePackage{xsr-core}
@@ -69,6 +69,33 @@
         \prop_gput:Nnn \g_xsr_active_detector_script_prop {#1} {#2}
         \clist_map_inline:nn {#2}
           { \xsr_active_detector_assign_range:nn {#1} {##1} }
+      }
+  }
+
+% Contextual suffix characters continue a matching run, but do not start one.
+% This keeps shared variation selectors usable outside the registered script.
+\cs_new_protected:Npn \xsr_active_detector_register_suffix:nnn #1#2#3
+  {
+    \int_step_inline:nnn {#2}{#3}
+      {
+        \char_set_catcode_active:n {##1}
+        \cs_gset_protected:cpx { g_xsr_active_suffix_##1: }
+          {
+            \exp_not:N \xsr_active_detector_marker:
+            \exp_not:N \xsr_active_detector_suffix:nn
+              {#1}{\char_generate:nn{##1}{12}}
+          }
+        \char_gset_active_eq:nc {##1}{g_xsr_active_suffix_##1:}
+      }
+  }
+\cs_new_protected:Npn \xsr_active_detector_suffix:nn #1#2
+  {
+    \tl_if_empty:NTF \l_xsr_active_detector_run_tl
+      {#2}
+      {
+        \str_if_eq:VnTF \l_xsr_active_detector_script_tl {#1}
+          {\xsr_active_detector_collect:nn{#1}{#2}}
+          {\xsr_active_detector_flush: #2}
       }
   }
 

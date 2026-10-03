@@ -1,0 +1,48 @@
+name: XSR verification
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      XSR_REQUIRE_REFERENCE_FONTS: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install focused XeLaTeX and PDF tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends texlive-xetex texlive-latex-recommended texlive-pictures lmodern poppler-utils
+      - name: Install package and test tools
+        run: python -m pip install '.[test]'
+      - name: Download checksum-verified official Noto reference font
+        run: python scripts/fetch_noto.py
+      - name: Verify Python, geometry, fonts and XeLaTeX
+        run: python -m pytest -ra --junitxml=tmp/test-results.xml
+      - name: Rebuild visual showcase without shell escape
+        shell: bash
+        run: |
+          NEWGARDINER=$(python -c "import hieropy,pathlib; print(pathlib.Path(hieropy.__file__).parent/'resources/NewGardiner.ttf')")
+          python scripts/build_showcase.py --font tmp/fonts/NotoSansEgyptianHieroglyphs-Regular.ttf --font "$NEWGARDINER" --output tmp/ci-showcase.pdf
+          python scripts/check_showcase.py tmp/ci-showcase.pdf
+          pdftoppm -scale-to 1400 -png tmp/ci-showcase.pdf tmp/ci-showcase
+      - name: Upload test report and visual artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xsr-linux-verification
+          path: |
+            tmp/test-results.xml
+            tmp/ci-showcase.pdf
+            tmp/ci-showcase-*.png
+            tmp/pdfs/showcase-build.log
+          if-no-files-found: warn

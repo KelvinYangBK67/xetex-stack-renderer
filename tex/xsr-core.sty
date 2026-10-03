@@ -2,7 +2,7 @@
 \ProvidesExplPackage
   {xsr-core}
   {2026-10-03}
-  {0.4.0}
+  {0.5}
   {Core run dispatcher for xetex-stack-renderer}
 
 \RequirePackage{expl3}
@@ -80,6 +80,17 @@
 \tl_new:N \l_xsr_request_digest_tl
 \tl_new:N \l_xsr_request_file_tl
 \tl_new:N \l_xsr_response_file_tl
+\bool_new:N \l_xsr_response_valid_bool
+\tl_new:N \l_xsr_error_detail_tl
+\msg_new:nnn {xsr}{renderer-error}{Renderer~error~[#1]:~#2}
+\msg_new:nnn {xsr}{malformed-response}{[XSR-RESPONSE]~Malformed~renderer~response:~#1}
+\NewDocumentCommand \xsrRendererError {m m}
+  {
+    \tl_clear:N \l_xsr_error_detail_tl
+    \clist_map_inline:nn {#2}
+      {\tl_put_right:Nx \l_xsr_error_detail_tl {\char_generate:nn{\int_from_hex:n{##1}}{12}}}
+    \msg_fatal:nnxx{xsr}{renderer-error}{#1}{\l_xsr_error_detail_tl}
+  }
 
 \cs_new_protected:Npn \xsr_prepare_request:nn #1#2
   {
@@ -124,7 +135,12 @@
   }
 
 \cs_new_protected:Npn \xsr_input_response:
-  { \exp_args:NV \file_input:n \l_xsr_response_file_tl }
+  {
+    \bool_set_false:N \l_xsr_response_valid_bool
+    \exp_args:NV \file_input:n \l_xsr_response_file_tl
+    \bool_if:NF \l_xsr_response_valid_bool
+      {\msg_fatal:nnx{xsr}{malformed-response}{\l_xsr_response_file_tl}}
+  }
 
 \cs_new_protected:Npn \xsr_unavailable_stub:nn #1#2
   {
@@ -138,6 +154,10 @@
     \sys_if_shell_unrestricted:TF
       {
         \xsr_write_request:n {#1}
+        % A failed invocation must never reuse a stale successful response.
+        \iow_open:NV \g_xsr_request_iow \l_xsr_response_file_tl
+        \iow_now:Nn \g_xsr_request_iow {\xsrRendererError{XSR-INVOCATION}{52,65,6E,64,65,72,65,72,20,64,69,64,20,6E,6F,74,20,70,72,6F,64,75,63,65,20,61,20,72,65,73,70,6F,6E,73,65}}
+        \iow_close:N \g_xsr_request_iow
         \sys_shell_now:x
           {
             \g_xsr_renderer_command_tl \c_space_tl render
@@ -193,6 +213,7 @@
 % Stable response command emitted by successful Python backends.
 \cs_new_protected:Npn \xsr_backend_result:nnnnn #1#2#3#4#5
   {
+    \bool_set_true:N \l_xsr_response_valid_bool
     \iow_term:x
       {
         XSR-BACKEND~script=#1~codepoints=#2~digest=#3
@@ -207,6 +228,7 @@
 % backend-owned TeX body. Core deliberately knows nothing about its geometry.
 \cs_new_protected:Npn \xsr_backend_layout_result:nnnnnn #1#2#3#4#5#6
   {
+    \bool_set_true:N \l_xsr_response_valid_bool
     \iow_term:x
       {
         XSR-BACKEND~script=#1~codepoints=#2~digest=#3

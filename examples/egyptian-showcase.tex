@@ -1,0 +1,79 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=18mm]{geometry}
+\usepackage[mode=preprocess,trace=false]{xetex-stack-renderer}
+\usepackage{array,xcolor}
+\input{showcase-fonts.tex}
+\definecolor{ink}{HTML}{17324D}
+\definecolor{frame}{HTML}{BACBD8}
+\setlength\parindent{0pt}
+\setlength\fboxsep{2pt}
+\setlength\fboxrule{0.3pt}
+\newcommand\sample[2]{{#1\fontsize{27}{32}\selectfont\fcolorbox{frame}{white}{#2}}}
+\ifnum\XSRFontCount=3
+  \newenvironment{comparison}{\begin{tabular}{@{}p{46mm}*{3}{>{\centering\arraybackslash}p{37mm}}@{}}}{\end{tabular}}
+  \newcommand\tablehead{\textbf{Structure} & \small\NameOne & \small\NameTwo & \small\NameThree\\[7pt]\hline\\[-6pt]}
+  \newcommand\samplerow[3]{#1\par{\scriptsize\ttfamily #2} & \sample{\FontOne}{#3} & \sample{\FontTwo}{#3} & \sample{\FontThree}{#3}\\[15pt]}
+\else
+  \newenvironment{comparison}{\begin{tabular}{@{}p{57mm}*{2}{>{\centering\arraybackslash}p{51mm}}@{}}}{\end{tabular}}
+  \newcommand\tablehead{\textbf{Structure} & \small\NameOne & \small\NameTwo\\[7pt]\hline\\[-6pt]}
+  \newcommand\samplerow[3]{#1\par{\scriptsize\ttfamily #2} & \sample{\FontOne}{#3} & \sample{\FontTwo}{#3}\\[15pt]}
+\fi
+\begin{document}
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.5}\par\smallskip
+{\large 01 / Signs and composition}\par\medskip
+Natural outline proportions, centered H/V groups and stable nesting.\par\medskip
+\begin{comparison}\tablehead
+\samplerow{Single tall sign}{A1}{𓀀}
+\samplerow{Single flat sign}{N35}{𓈖}
+\samplerow{Horizontal}{A1 H N35}{𓀀𓐱𓈖}
+\samplerow{Vertical}{A1 V N35}{𓀀𓐰𓈖}
+\samplerow{Nested H over V}{(A1 H B1) V G17}{𓀀𓐱𓁐𓐰𓅓}
+\samplerow{Nested V beside H}{A1 H (B1 V G17)}{𓀀𓐱𓐷𓁐𓐰𓅓𓐸}
+\samplerow{Different proportions}{A1 H N35 H G17}{𓀀𓐱𓈖𓐱𓅓}
+\end{comparison}\vfill
+{\small\color{ink}\textbf{Inspection notes}}\par\smallskip\small Identical Unicode in every column. Frames show the computed layout extent. H = U+13431; V = U+13430. Parentheses describe the structure, not literal punctuation.
+\newpage
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.5}\par\smallskip
+{\large 02 / Outline-aware insertion}\par\medskip
+Each inset is placed in a measured empty region of the host outline.\par\medskip
+\begin{comparison}\tablehead
+\samplerow{Top-left / top-start}{U+13432 / F4 + X1}{𓄂𓐲𓏏}
+\samplerow{Bottom-left / bottom-start}{U+13433 / I10 + A1}{𓆓𓐳𓀀}
+\samplerow{Top-right / top-end}{U+13434 / D17 + X1}{𓂇𓐴𓏏}
+\samplerow{Bottom-right / bottom-end}{U+13435 / G25 + X1}{𓅜𓐵𓏏}
+\samplerow{Middle / internal}{U+13439 / N37 + O34}{𓈙𓐹𓊃}
+\samplerow{Top opening}{U+1343A / D28 + J1}{𓂓𓐺𓐍}
+\samplerow{Bottom opening}{U+1343B / D32 + V28}{𓂘𓐻𓎛}
+\end{comparison}\vfill
+{\small\color{ink}\textbf{Inspection notes}}\par\smallskip\small Inset locations come from scan-converted outlines with a collision margin. Shapes with no usable cavity fail explicitly; no font-specific insertion coordinates or alternate glyph recipes are used.
+\newpage
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.5}\par\smallskip
+{\large 03 / Overlays and enclosures}\par\medskip
+Overlays share ink centers. Vector enclosures grow around actual content.\par\medskip
+\begin{comparison}\tablehead
+\samplerow{Overlay}{D36 overlay V28}{𓂝𓐶𓎛}
+\samplerow{Grouped overlay}{(A1 H B1) overlay (G17 V N35)}{𓐷𓀀𓐱𓁐𓐸𓐶𓐷𓅓𓐰𓈖𓐸}
+\samplerow{Cartouche}{V11a / U+1343C..D / V11b}{𓍹𓐼𓀀𓅓𓐽𓍺}
+\samplerow{Rectangular enclosure}{O6a / U+1343C..D / O6d}{𓉘𓐼𓀀𓐱𓅓𓐽𓉛}
+\samplerow{Walled enclosure}{O36a / U+1343E..F / O36b}{𓊆𓐾𓀀𓅓𓐿𓊇}
+\samplerow{Missing enclosure ends}{Bare U+1343C..D}{𓐼𓀀𓅓𓐽}
+\samplerow{Enclosed insertion}{Cartouche with F4 + X1}{𓍹𓐼𓄂𓐲𓏏𓐽𓍺}
+\end{comparison}\vfill
+{\small\color{ink}\textbf{Inspection notes}}\par\smallskip\small Common cartouche, rectangular and walled end pairs are drawn by XSR. Missing end delimiters leave that end open. Overlay overlap is intentional. Ornate delimiter variants remain unsupported.
+\newpage
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.5}\par\smallskip
+{\large 04 / Transforms, damage and combinations}\par\medskip
+Rotation precedes mirroring. Hatching marks damaged or missing text.\par\medskip
+\begin{comparison}\tablehead
+\samplerow{Mirror}{A1 / U+13440}{𓀀𓑀}
+\samplerow{Quarter turn}{V26 / VS1 / 90 degrees clockwise}{𓎙︀}
+\samplerow{Diagonal turn}{V28 / VS4 / 45 degrees clockwise}{𓎛︃}
+\samplerow{Rotate, then mirror}{G17 / VS1 / U+13440}{𓅓︀𓑀}
+\samplerow{Partial damage}{A1 / U+1344B / top half}{𓀀𓑋}
+\samplerow{Full damage}{G17 / U+13455}{𓅓𓑕}
+\samplerow{Lost signs}{Full / half / tall / wide}{𓑃𓑄𓑅𓑆}
+\samplerow{Nested insertion}{F4 top-left (D28 top J1)}{𓄂𓐲𓐷𓂓𓐺𓐍𓐸}
+\samplerow{Insertion plus H/V}{I10 bottom-left A1, beside G17}{𓆓𓐳𓀀𓐱𓅓}
+\end{comparison}\vfill
+{\small\color{ink}\textbf{Inspection notes}}\par\smallskip\small Normal compatible outline fonts use one code path. Rotation selectors are applied geometrically, not as font-specific variants. Continuous lost-sign shading and damaged enclosure end caps are not implemented.
+\end{document}

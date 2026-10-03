@@ -17,3 +17,5 @@ dist/
 # Keep the intentional visual deliverable; local fonts and build files stay out.
 !examples/font-metrics-showcase.pdf
 tmp/
+
+!examples/egyptian-showcase.pdf

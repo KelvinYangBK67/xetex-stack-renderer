@@ -77,9 +77,15 @@ def test_geometry_serializes_to_xetex_layout_commands():
         r'{\xsrEgyptianGlyph{13000}{0.1}{0.2}{0.7}{0.8}{0.75}{-0.1}{0.9}}')
 
 
-def test_unsupported_overlay_is_not_silently_rendered(font):
-    with pytest.raises(EgyptianLayoutError, match='Overlay'):
-        HieropyAdapter().layout(A + chr(0x13436) + B, font)
+def test_overlay_centers_actual_ink(font):
+    result = HieropyAdapter().layout(A + chr(0x13436) + B, font)
+    first, second = result.glyphs
+    assert first.x + first.width/2 == pytest.approx(second.x + second.width/2)
+    assert first.y + first.height/2 == pytest.approx(second.y + second.height/2)
+
+def test_unsupported_delimiter_damage_is_explicit(font):
+    with pytest.raises(EgyptianLayoutError, match='damaged enclosure delimiters'):
+        HieropyAdapter().layout(chr(0x13379)+chr(0x13447)+chr(0x1343C)+A+chr(0x1343D)+chr(0x1337A),font)
 
 
 def test_hieropy_geometry_is_never_used(monkeypatch, font):

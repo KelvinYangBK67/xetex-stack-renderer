@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Protocol, Sequence
@@ -202,56 +203,8 @@ def render_request(args: argparse.Namespace) -> int:
 
 
 def preprocess(args: argparse.Namespace) -> int:
-    source = args.input.read_text(encoding='utf-8')
-    registry = build_default_registry()
-    output_dir: Path = args.output_dir
-    jobname = args.jobname or args.input.stem
-    cache_dir = args.cache_dir or output_dir / '.xsr-cache'
-    renderer = default_renderer(cache_dir)
-    options: dict[str, object] = {}
-    if args.font:
-        from .font_metrics import load_font, tex_font_path
-        font = load_font(args.font)
-        options = {'font_digest': font.digest, 'font_path': tex_font_path(font.path)}
-    manifest_runs: list[dict[str, object]] = []
-
-    for number, run in enumerate(registry.script_runs(source), start=1):
-        assert run.script is not None
-        backend_version = renderer.backend_version(run.script)
-        digest = request_digest(run.script, backend_version, run.text, options)
-        response = output_dir / response_filename(
-            jobname, run.script, backend_version, run.text, options
-        )
-        write_tex(response, renderer.render(run.script, run.text, options))
-        manifest_runs.append(
-            {
-                'number': number,
-                'digest': digest,
-                'script': run.script,
-                'backend_version': backend_version,
-                'options': options,
-                'start': run.start,
-                'end': run.end,
-                'codepoints': [f'{ord(character):X}' for character in run.text],
-                'response': response.name,
-            }
-        )
-
-    source_digest = hashlib.sha256(source.encode('utf-8')).hexdigest()
-    manifest = {
-        'format': 'XSR-PREPROCESS-2',
-        'source': str(args.input),
-        'source_sha256': source_digest,
-        'runs': manifest_runs,
-    }
-    manifest_path = output_dir / f'{jobname}.xsr-manifest.json'
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + '\n',
-        encoding='utf-8',
-        newline='\n',
-    )
-    return 0
+    from .preprocess import preprocess as prepare_sources
+    return prepare_sources(args)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -268,9 +221,10 @@ def build_parser() -> argparse.ArgumentParser:
     preprocess_parser = subparsers.add_parser(
         'preprocess', help='prepare content-addressed responses before XeLaTeX'
     )
-    preprocess_parser.add_argument('--input', type=Path, required=True)
+    preprocess_parser.add_argument('--input', type=Path, action='append', required=True)
     preprocess_parser.add_argument('--output-dir', type=Path, required=True)
-    preprocess_parser.add_argument('--font', type=Path, help='actual Egyptian font file (required for Egyptian runs)')
+    preprocess_parser.add_argument('--font', type=Path, action='append', help='additional Egyptian font file; repeat for multiple fonts')
+    preprocess_parser.add_argument('--tex-workdir', type=Path, help='XeLaTeX working directory (default: output-dir)')
     preprocess_parser.add_argument('--jobname')
     preprocess_parser.add_argument('--cache-dir', type=Path)
     preprocess_parser.set_defaults(func=preprocess)
@@ -282,8 +236,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return args.func(args)
-    except ValueError as error:
-        parser.exit(2, f'xsr-render: error: {error}\n')
+    except (ValueError, OSError, UnicodeError, OverflowError) as error:
+        code = getattr(error, 'code', 'XSR-REQUEST' if isinstance(error, ValueError) else 'XSR-IO')
+        detail = str(error)
+        if args.command == 'render' and '.xsr-' in args.output.name:
+            # Replace any older successful response with a typed error response.
+            # The message uses character codes, not interpolated TeX source.
+            encoded = ','.join(f'{ord(ch):X}' for ch in detail)
+            write_tex(args.output, rf'\xsrRendererError{{{code}}}{{{encoded}}}%' + '\n')
+        if hasattr(sys.stderr, 'reconfigure'):
+            sys.stderr.reconfigure(encoding='utf-8', errors='backslashreplace')
+        parser.exit(2, f'xsr-render: [{code}] {detail}\n')
 
 
 if __name__ == '__main__':

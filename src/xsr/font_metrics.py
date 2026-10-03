@@ -6,6 +6,8 @@ from io import BytesIO
 from pathlib import Path
 import re
 
+from .errors import XSRError
+
 from fontTools.pens.boundsPen import BoundsPen
 from fontTools.pens.recordingPen import DecomposingRecordingPen
 from fontTools.pens.transformPen import TransformPen
@@ -17,11 +19,38 @@ def font_file_digest(path: str | Path) -> str:
 
 
 def tex_font_path(path: str | Path) -> str:
-    """Limit the TeX bridge to unambiguous, literal ASCII file paths."""
+    """Unicode paths are transported as codepoints, never interpolated as TeX."""
     value = Path(path).resolve().as_posix()
-    if not re.fullmatch(r'[A-Za-z0-9_ ./:-]+', value):
-        raise ValueError('font path must use ASCII letters, digits, spaces, _ . / : -')
+    if any(ch in value for ch in '\x00\r\n"{}%#[]'):
+        raise XSRError('XSR-FONT-PATH', 'font path contains a reserved TeX/XeTeX filename character')
     return value
+
+
+def encode_path(path: str | Path) -> str:
+    return ','.join(f'{ord(ch):X}' for ch in str(path))
+
+
+def decode_path(encoded: str) -> str:
+    try:
+        value = ''.join(chr(int(cp,16)) for cp in encoded.split(','))
+    except (ValueError, OverflowError) as error:
+        raise XSRError('XSR-REQUEST', 'malformed font path codepoints') from error
+    tex_font_path(value)
+    return value
+
+
+def font_options(path: str | Path, *, spelling: str | None = None) -> dict:
+    font = load_font(path)
+    return {'font_codepoints': encode_path(spelling if spelling is not None else tex_font_path(font.path)),
+            'font_digest': font.digest}
+
+
+def options_font(options) -> 'FontMetrics':
+    path = (decode_path(options['font_codepoints']) if options.get('font_codepoints')
+            else options.get('font_path'))
+    if not path:
+        raise XSRError('XSR-FONT-NOT-SELECTED', 'Egyptian rendering requires an explicit font_path; use \\xsrEgyptianDefaultFont')
+    return load_font(path, options.get('font_digest'))
 
 
 @dataclass(frozen=True)
@@ -51,11 +80,15 @@ class FontMetrics:
         try:
             data = self.path.read_bytes()
             self._font = TTFont(BytesIO(data))
-        except (OSError, TTLibError) as error:
-            raise ValueError(f'cannot load font {self.path}: {error}') from error
+        except OSError as error:
+            raise XSRError('XSR-FONT-MISSING', f'cannot load font {self.path}: {error.strerror}') from error
+        except TTLibError as error:
+            raise XSRError('XSR-FONT-FORMAT', f'cannot load font {self.path}: use a static TTF/OTF, not a collection or webfont') from error
         if self._font.flavor or 'fvar' in self._font:
-            raise ValueError('use a static, uncompressed TTF or OTF font')
+            raise XSRError('XSR-FONT-FORMAT', 'use a static, uncompressed TTF or OTF font; variable fonts are unsupported')
         self.digest = hashlib.md5(data, usedforsecurity=False).hexdigest().upper()
+        if not {'head','hhea','hmtx','cmap','name'} <= set(self._font.keys()) or not ({'glyf','CFF '} & set(self._font.keys())):
+            raise XSRError('XSR-FONT-FORMAT', 'font lacks required Unicode outline/metric tables')
         self.units_per_em = self._font['head'].unitsPerEm
         self.ascender = self._font['hhea'].ascent / self.units_per_em
         self.descender = self._font['hhea'].descent / self.units_per_em
@@ -68,7 +101,7 @@ class FontMetrics:
     def _glyph(self, codepoint: int):
         name = self._cmap.get(codepoint)
         if name is None or name == '.notdef':
-            raise ValueError(f'{self.path.name} has no glyph for U+{codepoint:05X}')
+            raise XSRError('XSR-GLYPH-MISSING', f'{self.path.name} has no glyph for U+{codepoint:05X}')
         return self._glyphs[name]
 
     def glyph(self, codepoint: int) -> GlyphMetrics:
@@ -77,11 +110,11 @@ class FontMetrics:
             pen = BoundsPen(self._glyphs)
             glyph.draw(pen)
             if pen.bounds is None:
-                raise ValueError(f'U+{codepoint:05X} has no outline in {self.path.name}')
+                raise XSRError('XSR-GLYPH-EMPTY', f'U+{codepoint:05X} has no outline in {self.path.name}')
             bounds = tuple(value / self.units_per_em for value in pen.bounds)
             metric = GlyphMetrics(glyph.width / self.units_per_em, bounds)
             if metric.width <= 0 or metric.height <= 0:
-                raise ValueError(f'U+{codepoint:05X} has an empty ink box')
+                raise XSRError('XSR-GLYPH-EMPTY', f'U+{codepoint:05X} has an empty ink box')
             self._metrics[codepoint] = metric
         return self._metrics[codepoint]
 
@@ -107,7 +140,7 @@ def load_font(path: str | Path, digest: str | None = None) -> FontMetrics:
     try:
         actual = font_file_digest(resolved)
     except OSError as error:
-        raise ValueError(f'cannot load font {resolved}: {error}') from error
+        raise XSRError('XSR-FONT-MISSING', f'cannot load font {resolved}: {error.strerror}') from error
     if digest is not None and digest != actual:
-        raise ValueError('font digest mismatch; regenerate the request/preprocessed output')
+        raise XSRError('XSR-STALE', 'font digest mismatch; regenerate the request/preprocessed output')
     return _load_font(resolved, actual)

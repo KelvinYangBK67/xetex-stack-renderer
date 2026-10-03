@@ -12,7 +12,7 @@ EGYPTIAN_RANGES = (
 
 
 def register_script(registry: Registry) -> ScriptSpec:
-    return registry.register('egyptian', EGYPTIAN_RANGES)
+    return registry.register('egyptian', EGYPTIAN_RANGES, suffixes=((0xFE00, 0xFE06),))
 
 
 from .backend import (  # noqa: E402

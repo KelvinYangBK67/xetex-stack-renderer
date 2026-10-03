@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from xsr.cache import RenderCache
+from xsr.font_metrics import decode_path
 from xsr.egyptian import BACKEND_VERSION, EgyptianBackend
 from xsr.renderer import (
     RenderRequest,
@@ -95,7 +96,7 @@ def test_preprocess_writes_content_addressed_response_and_manifest(
 
     assert main(
         [
-            'preprocess', '--font', font_options['font_path'],
+            'preprocess', '--font', decode_path(font_options['font_codepoints']),
             '--input',
             str(source),
             '--output-dir',
@@ -121,7 +122,7 @@ def test_changed_run_cannot_reuse_same_numbered_response(tmp_path: Path, font_op
 
     source.write_text(f'ordinary {chr(0x13000)} ordinary\n', encoding='utf-8')
     assert main(
-        ['preprocess', '--font', font_options['font_path'], '--input', str(source), '--output-dir', str(output)]
+        ['preprocess', '--font', decode_path(font_options['font_codepoints']), '--input', str(source), '--output-dir', str(output)]
     ) == 0
     first_manifest = json.loads(
         (output / 'sample.xsr-manifest.json').read_text(encoding='utf-8')
@@ -130,7 +131,7 @@ def test_changed_run_cannot_reuse_same_numbered_response(tmp_path: Path, font_op
 
     source.write_text(f'ordinary {chr(0x13001)} ordinary\n', encoding='utf-8')
     assert main(
-        ['preprocess', '--font', font_options['font_path'], '--input', str(source), '--output-dir', str(output)]
+        ['preprocess', '--font', decode_path(font_options['font_codepoints']), '--input', str(source), '--output-dir', str(output)]
     ) == 0
     second_manifest = json.loads(
         (output / 'sample.xsr-manifest.json').read_text(encoding='utf-8')

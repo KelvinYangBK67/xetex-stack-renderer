@@ -25,6 +25,7 @@ class UnicodeRange:
 class ScriptSpec:
     name: str
     ranges: tuple[UnicodeRange, ...]
+    suffixes: tuple[UnicodeRange, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -47,7 +48,7 @@ class Registry:
     def scripts(self) -> tuple[ScriptSpec, ...]:
         return tuple(self._scripts.values())
 
-    def register(self, name: str, ranges: Iterable[tuple[int, int]]) -> ScriptSpec:
+    def register(self, name: str, ranges: Iterable[tuple[int, int]], *, suffixes: Iterable[tuple[int, int]] = ()) -> ScriptSpec:
         if not name or name in self._scripts:
             raise ValueError(f"script is empty or already registered: {name!r}")
 
@@ -63,7 +64,7 @@ class Registry:
                             f"range overlap between {name!r} and {existing.name!r}"
                         )
 
-        spec = ScriptSpec(name=name, ranges=new_ranges)
+        spec = ScriptSpec(name=name, ranges=new_ranges, suffixes=tuple(UnicodeRange(a,b) for a,b in suffixes))
         self._scripts[name] = spec
         return spec
 
@@ -85,6 +86,9 @@ class Registry:
         current = self.script_for(text[0])
         for index, character in enumerate(text[1:], start=1):
             script = self.script_for(character)
+            if script is None and current is not None:
+                if any(r.contains(ord(character)) for r in self._scripts[current].suffixes):
+                    script = current
             if script != current:
                 yield DetectedRun(current, text[start:index], start, index)
                 start = index
