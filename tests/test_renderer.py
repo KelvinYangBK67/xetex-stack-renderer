@@ -19,8 +19,8 @@ def ehfc_run() -> str:
     return chr(0x13000) + chr(0x13431) + chr(0x13050)
 
 
-def write_request(path: Path, text: str) -> str:
-    digest = request_digest('egyptian', BACKEND_VERSION, text, {})
+def write_request(path: Path, text: str, options: dict) -> str:
+    digest = request_digest('egyptian', BACKEND_VERSION, text, options)
     codepoints = ','.join(f'{ord(character):X}' for character in text)
     path.write_text(
         '\n'.join(
@@ -29,7 +29,7 @@ def write_request(path: Path, text: str) -> str:
                 f'digest={digest}',
                 'script=egyptian',
                 f'backend_version={BACKEND_VERSION}',
-                f'options={canonical_options({})}',
+                f'options={canonical_options(options)}',
                 f'codepoints={codepoints}',
                 '',
             ]
@@ -39,25 +39,25 @@ def write_request(path: Path, text: str) -> str:
     return digest
 
 
-def test_backend_parses_and_renders_one_complete_run(tmp_path: Path) -> None:
+def test_backend_parses_and_renders_one_complete_run(tmp_path: Path, font_options) -> None:
     renderer = Renderer(RenderCache(tmp_path / 'cache'))
     renderer.register(EgyptianBackend())
     run = ehfc_run()
 
-    tex = renderer.render('egyptian', run)
+    tex = renderer.render('egyptian', run, font_options)
 
     assert tex.startswith(r'\xsrBackendLayoutResult{egyptian}{3}')
     assert f'{{{BACKEND_VERSION}}}{{hieropy-0.1.4}}' in tex
     assert r'\xsrEgyptianLayout' in tex
     assert tex.count(r'\xsrEgyptianGlyph') == 2
     assert len(list((tmp_path / 'cache').glob('*.tex'))) == 1
-    assert renderer.render('egyptian', run) == tex
+    assert renderer.render('egyptian', run, font_options) == tex
 
 
-def test_render_request_protocol_is_bound_to_all_inputs(tmp_path: Path) -> None:
+def test_render_request_protocol_is_bound_to_all_inputs(tmp_path: Path, font_options) -> None:
     run = ehfc_run()
     request_path = tmp_path / 'run.req'
-    digest = write_request(request_path, run)
+    digest = write_request(request_path, run, font_options)
     response = tmp_path / f'run.xsr-{digest}.tex'
 
     request = read_request(request_path)
@@ -65,7 +65,7 @@ def test_render_request_protocol_is_bound_to_all_inputs(tmp_path: Path) -> None:
         digest=digest,
         script='egyptian',
         backend_version=BACKEND_VERSION,
-        options={},
+        options=font_options,
         text=run,
     )
     assert main(
@@ -87,7 +87,7 @@ def test_render_request_protocol_is_bound_to_all_inputs(tmp_path: Path) -> None:
 
 
 def test_preprocess_writes_content_addressed_response_and_manifest(
-    tmp_path: Path,
+    tmp_path: Path, font_options,
 ) -> None:
     source = tmp_path / 'sample.tex'
     source.write_text(f'ordinary {ehfc_run()} ordinary\n', encoding='utf-8')
@@ -95,7 +95,7 @@ def test_preprocess_writes_content_addressed_response_and_manifest(
 
     assert main(
         [
-            'preprocess',
+            'preprocess', '--font', font_options['font_path'],
             '--input',
             str(source),
             '--output-dir',
@@ -110,18 +110,18 @@ def test_preprocess_writes_content_addressed_response_and_manifest(
     assert manifest['format'] == 'XSR-PREPROCESS-2'
     assert run['script'] == 'egyptian'
     assert run['backend_version'] == BACKEND_VERSION
-    assert run['options'] == {}
+    assert run['options'] == font_options
     assert run['digest'] in run['response']
     assert (output / run['response']).is_file()
 
 
-def test_changed_run_cannot_reuse_same_numbered_response(tmp_path: Path) -> None:
+def test_changed_run_cannot_reuse_same_numbered_response(tmp_path: Path, font_options) -> None:
     source = tmp_path / 'sample.tex'
     output = tmp_path / 'prepared'
 
     source.write_text(f'ordinary {chr(0x13000)} ordinary\n', encoding='utf-8')
     assert main(
-        ['preprocess', '--input', str(source), '--output-dir', str(output)]
+        ['preprocess', '--font', font_options['font_path'], '--input', str(source), '--output-dir', str(output)]
     ) == 0
     first_manifest = json.loads(
         (output / 'sample.xsr-manifest.json').read_text(encoding='utf-8')
@@ -130,7 +130,7 @@ def test_changed_run_cannot_reuse_same_numbered_response(tmp_path: Path) -> None
 
     source.write_text(f'ordinary {chr(0x13001)} ordinary\n', encoding='utf-8')
     assert main(
-        ['preprocess', '--input', str(source), '--output-dir', str(output)]
+        ['preprocess', '--font', font_options['font_path'], '--input', str(source), '--output-dir', str(output)]
     ) == 0
     second_manifest = json.loads(
         (output / 'sample.xsr-manifest.json').read_text(encoding='utf-8')
@@ -142,9 +142,9 @@ def test_changed_run_cannot_reuse_same_numbered_response(tmp_path: Path) -> None
     assert (output / second_response).is_file()
 
 
-def test_request_digest_rejects_changed_codepoints(tmp_path: Path) -> None:
+def test_request_digest_rejects_changed_codepoints(tmp_path: Path, font_options) -> None:
     request_path = tmp_path / 'run.req'
-    write_request(request_path, chr(0x13000))
+    write_request(request_path, chr(0x13000), font_options)
     request_path.write_text(
         request_path.read_text(encoding='utf-8').replace('13000', '13001'),
         encoding='utf-8',

@@ -104,6 +104,11 @@ class Renderer:
             raise ValueError(f'unknown backend: {script}') from error
 
         normalized_options = dict(options or {})
+        # Backend-owned external inputs must be validated before a cache hit.
+        # This optional hook keeps file/font knowledge out of generic dispatch.
+        prepare = getattr(backend, 'prepare_options', None)
+        if prepare is not None:
+            normalized_options = prepare(normalized_options)
         key = RenderCache.key(backend.name, backend.version, text, normalized_options)
         if self.cache is not None:
             cached = self.cache.get(key)
@@ -204,6 +209,10 @@ def preprocess(args: argparse.Namespace) -> int:
     cache_dir = args.cache_dir or output_dir / '.xsr-cache'
     renderer = default_renderer(cache_dir)
     options: dict[str, object] = {}
+    if args.font:
+        from .font_metrics import load_font, tex_font_path
+        font = load_font(args.font)
+        options = {'font_digest': font.digest, 'font_path': tex_font_path(font.path)}
     manifest_runs: list[dict[str, object]] = []
 
     for number, run in enumerate(registry.script_runs(source), start=1):
@@ -261,6 +270,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     preprocess_parser.add_argument('--input', type=Path, required=True)
     preprocess_parser.add_argument('--output-dir', type=Path, required=True)
+    preprocess_parser.add_argument('--font', type=Path, help='actual Egyptian font file (required for Egyptian runs)')
     preprocess_parser.add_argument('--jobname')
     preprocess_parser.add_argument('--cache-dir', type=Path)
     preprocess_parser.set_defaults(func=preprocess)

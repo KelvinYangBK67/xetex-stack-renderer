@@ -1,0 +1,54 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=18mm]{geometry}
+\usepackage[mode=preprocess,trace=false]{xetex-stack-renderer}
+\usepackage{array,xcolor}
+\input{font-metrics-fonts.tex}
+\definecolor{ink}{HTML}{17324D}
+\definecolor{rulecolor}{HTML}{B8C8D6}
+\setlength\parindent{0pt}
+\setlength\fboxsep{2pt}
+\setlength\fboxrule{0.3pt}
+\newcommand\sample[2]{{#1\fontsize{27}{32}\selectfont\fcolorbox{rulecolor}{white}{#2}}}
+\newcommand\heading[2]{
+ {\color{ink}\LARGE\bfseries Egyptian font metrics}\par\smallskip
+ {\large #1}\par\medskip
+ #2\par\medskip
+}
+\newcommand\tablehead{\textbf{Structure} & \footnotesize\NameOne & \small\NameTwo & \small\NameThree\\[8pt]\hline\\[-6pt]}
+\begin{document}
+\heading{01 / Basic signs and joins}{Same Unicode input in every column. Each font supplies its own outline bounds.
+The pale frames show the resulting layout box, with 0.04 em padding.}
+\begin{tabular}{@{}p{47mm}*{3}{>{\centering\arraybackslash}p{36mm}}@{}}
+\tablehead
+Single / seated man\par{\scriptsize\ttfamily A1} & \sample{\FontOne}{𓀀} & \sample{\FontTwo}{𓀀} & \sample{\FontThree}{𓀀}\\[20pt]
+Single / bird\par{\scriptsize\ttfamily G17} & \sample{\FontOne}{𓅓} & \sample{\FontTwo}{𓅓} & \sample{\FontThree}{𓅓}\\[20pt]
+Single / water\par{\scriptsize\ttfamily N35} & \sample{\FontOne}{𓈖} & \sample{\FontTwo}{𓈖} & \sample{\FontThree}{𓈖}\\[20pt]
+Plain sequence\par{\scriptsize\ttfamily A1  B1  G17} & \sample{\FontOne}{𓀀𓁐𓅓} & \sample{\FontTwo}{𓀀𓁐𓅓} & \sample{\FontThree}{𓀀𓁐𓅓}\\[20pt]
+Horizontal / tall + wide\par{\scriptsize\ttfamily A1 H N35} & \sample{\FontOne}{𓀀𓐱𓈖} & \sample{\FontTwo}{𓀀𓐱𓈖} & \sample{\FontThree}{𓀀𓐱𓈖}\\[20pt]
+Vertical / tall + wide\par{\scriptsize\ttfamily A1 V N35} & \sample{\FontOne}{𓀀𓐰𓈖} & \sample{\FontTwo}{𓀀𓐰𓈖} & \sample{\FontThree}{𓀀𓐰𓈖}\\[20pt]
+\end{tabular}
+\vfill
+{\small\color{ink}\textbf{Reading the comparison}}\par\smallskip
+\small H = horizontal joiner (U+13431); V = vertical joiner (U+13430).
+Parentheses on page 2 describe the tree; segments use U+13437 / U+13438 where needed.
+Latin text retains the document font; only the signs use the selected file.
+\newpage
+\heading{02 / Nested H/V relationships}{Check left-to-right and top-to-bottom order, centered children, visible gaps,
+and containment within each frame. All columns use the same layout code.}
+\begin{tabular}{@{}p{47mm}*{3}{>{\centering\arraybackslash}p{36mm}}@{}}
+\tablehead
+Horizontal then vertical\par{\scriptsize\ttfamily (A1 H B1) V G17} & \sample{\FontOne}{𓀀𓐱𓁐𓐰𓅓} & \sample{\FontTwo}{𓀀𓐱𓁐𓐰𓅓} & \sample{\FontThree}{𓀀𓐱𓁐𓐰𓅓}\\[20pt]
+Vertical inside horizontal\par{\scriptsize\ttfamily A1 H (B1 V G17)} & \sample{\FontOne}{𓀀𓐱𓐷𓁐𓐰𓅓𓐸} & \sample{\FontTwo}{𓀀𓐱𓐷𓁐𓐰𓅓𓐸} & \sample{\FontThree}{𓀀𓐱𓐷𓁐𓐰𓅓𓐸}\\[20pt]
+Two vertical columns\par{\scriptsize\ttfamily (A1 V N35) H (G17 V B1)} & \sample{\FontOne}{𓐷𓀀𓐰𓈖𓐸𓐱𓐷𓅓𓐰𓁐𓐸} & \sample{\FontTwo}{𓐷𓀀𓐰𓈖𓐸𓐱𓐷𓅓𓐰𓁐𓐸} & \sample{\FontThree}{𓐷𓀀𓐰𓈖𓐸𓐱𓐷𓅓𓐰𓁐𓐸}\\[20pt]
+Three vertical levels\par{\scriptsize\ttfamily N35 V G17 V A1} & \sample{\FontOne}{𓈖𓐰𓅓𓐰𓀀} & \sample{\FontTwo}{𓈖𓐰𓅓𓐰𓀀} & \sample{\FontThree}{𓈖𓐰𓅓𓐰𓀀}\\[20pt]
+Wide signs over tall sign\par{\scriptsize\ttfamily (N35 H B1) V A1} & \sample{\FontOne}{𓈖𓐱𓁐𓐰𓀀} & \sample{\FontTwo}{𓈖𓐱𓁐𓐰𓀀} & \sample{\FontThree}{𓈖𓐱𓁐𓐰𓀀}\\[20pt]
+Deeper nesting\par{\scriptsize\ttfamily A1 H (B1 V (G17 H N35))} & \sample{\FontOne}{𓀀𓐱𓐷𓁐𓐰𓅓𓐱𓈖𓐸} & \sample{\FontTwo}{𓀀𓐱𓐷𓁐𓐰𓅓𓐱𓈖𓐸} & \sample{\FontThree}{𓀀𓐱𓐷𓁐𓐰𓅓𓐱𓈖𓐸}\\[20pt]
+\end{tabular}
+\vfill
+{\small\color{ink}\textbf{Scope of this comparison}}\par\smallskip
+\small XSR 0.4.0. Hieropy parses structure; fontTools measures the selected font;
+XSR packs the ink boxes; XeTeX renders that same font file.
+Natural proportions are retained and groups shrink to at most 1 em in height.
+This is generic geometric packing, without font-specific optical corrections.
+Insertion, overlays, enclosures, rotation and damage are outside this release.
+\end{document}

@@ -21,14 +21,16 @@ from .backend import (  # noqa: E402
     serialize_tex_layout,
 )
 from .hieropy_adapter import EgyptianParseError, HieropyAdapter  # noqa: E402
-from .layout import EgyptianLayoutError, HieropyLayout  # noqa: E402
-from .model import GlyphPlacement, ParsedEgyptianRun, RenderResult  # noqa: E402
+from .layout import EgyptianLayout, EgyptianLayoutError, HieropyLayout  # noqa: E402
+from .model import EgyptianNode, GlyphPlacement, ParsedEgyptianRun, RenderResult  # noqa: E402
 
 __all__ = [
     'BACKEND_VERSION',
     'EGYPTIAN_RANGES',
     'EgyptianBackend',
+    'EgyptianLayout',
     'EgyptianLayoutError',
+    'EgyptianNode',
     'EgyptianParseError',
     'GlyphPlacement',
     'HieropyAdapter',

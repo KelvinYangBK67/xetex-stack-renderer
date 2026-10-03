@@ -1,15 +1,11 @@
-'''Narrow adapter from Unicode Egyptian/EHFC text to Hieropy.'''
-
-from __future__ import annotations
-
+"""Convert Hieropy syntax to an immutable XSR tree, never calling its layout."""
 from typing import Any
-
-from .model import ParsedEgyptianRun, RenderResult
+from ..font_metrics import FontMetrics
+from .model import EgyptianNode, ParsedEgyptianRun, RenderResult
+from .layout import EgyptianLayout, EgyptianLayoutError
 
 
 class EgyptianParseError(ValueError):
-    '''Raised when Hieropy rejects an Egyptian Unicode/EHFC run.'''
-
     def __init__(self, text: str, detail: str) -> None:
         self.text = text
         self.detail = detail
@@ -17,13 +13,27 @@ class EgyptianParseError(ValueError):
         super().__init__(f'Hieropy could not parse Egyptian run [{codepoints}]: {detail}')
 
 
-class HieropyAdapter:
-    '''Keep Hieropy classes and error conventions behind one XSR API.'''
+def _structure(node: object) -> EgyptianNode:
+    from hieropy.unistructure import Fragment, Horizontal, Literal, Vertical
+    if isinstance(node, Literal):
+        unsupported = [label for flag, label in (
+            (node.vs, 'rotation/variation'), (node.mirror, 'mirror'),
+            (node.damage, 'damage')) if flag]
+        if unsupported:
+            raise EgyptianLayoutError('unsupported Literal feature(s): ' + ', '.join(unsupported))
+        return EgyptianNode('sign', codepoint=ord(node.ch))
+    kinds = {Fragment: 'run', Horizontal: 'horizontal', Vertical: 'vertical'}
+    if type(node) not in kinds:
+        raise EgyptianLayoutError(f'unsupported Hieropy group for basic H/V layout: {type(node).__name__}')
+    if not node.groups:
+        raise EgyptianLayoutError('empty Egyptian groups cannot be laid out')
+    return EgyptianNode(kinds[type(node)], tuple(_structure(child) for child in node.groups))
 
+
+class HieropyAdapter:
     def __init__(self, parser: Any | None = None) -> None:
         if parser is None:
             import hieropy
-
             parser = hieropy.UniParser()
             self.parser_version = hieropy.__version__
         else:
@@ -34,21 +44,11 @@ class HieropyAdapter:
         try:
             fragment = self._parser.parse(text)
         except Exception as error:
-            detail = str(error) or type(error).__name__
-            raise EgyptianParseError(text, detail) from error
-
+            raise EgyptianParseError(text, str(error) or type(error).__name__) from error
         detail = str(getattr(self._parser, 'last_error', '') or '').strip()
         if fragment is None or detail:
             raise EgyptianParseError(text, detail or 'parser returned no Fragment')
+        return ParsedEgyptianRun(text, self.parser_version, _structure(fragment))
 
-        return ParsedEgyptianRun(
-            text=text,
-            parser_version=self.parser_version,
-            fragment=fragment,
-        )
-
-    def layout(self, text: str) -> RenderResult:
-        '''Parse and lay out one run without leaking Hieropy objects.'''
-        from .layout import HieropyLayout
-
-        return HieropyLayout().layout(self.parse(text))
+    def layout(self, text: str, font: FontMetrics) -> RenderResult:
+        return EgyptianLayout(font).layout(self.parse(text))

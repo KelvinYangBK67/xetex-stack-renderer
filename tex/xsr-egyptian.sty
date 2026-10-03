@@ -1,8 +1,8 @@
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesExplPackage
   {xsr-egyptian}
-  {2026-08-31}
-  {0.3.0}
+  {2026-10-03}
+  {0.4.0}
   {Egyptian backend registration for xetex-stack-renderer}
 
 \RequirePackage{xsr-core}
@@ -10,45 +10,79 @@
 
 \ExplSyntaxOn
 
-% Backend handler contract: (script name, complete Unicode run).
+
+\tl_new:N \l_xsr_egyptian_font_path_tl
+\tl_new:N \l_xsr_egyptian_font_digest_tl
+\msg_new:nnn { xsr } { font-required }
+  { Select~an~Egyptian~font~file~with~\string\xsrEgyptianFont. }
+\msg_new:nnn { xsr } { font-changed }
+  { Egyptian~font~file~changed~or~is~missing;~regenerate~the~response. }
+\msg_new:nnn { xsr } { font-path }
+  { Use~a~literal~ASCII~font~path~with~forward~slashes. }
+
+% Scoped selection; the actual file digest joins the existing generic options.
+\NewDocumentCommand \xsrEgyptianFont { m }
+  {
+    \regex_match:nnF { \A [A-Za-z0-9_\ ./:\-]+ \Z } {#1}
+      { \msg_fatal:nn { xsr } { font-path } }
+    \tl_set:Nn \l_xsr_egyptian_font_path_tl {#1}
+  }
 \cs_new_protected:Npn \xsr_egyptian_render:nn #1#2
-  { \xsr_external_render:nn {#1} {#2} }
+  {
+    \group_begin:
+      \tl_if_empty:NT \l_xsr_egyptian_font_path_tl
+        { \msg_fatal:nn { xsr } { font-required } }
+      \tl_set:Nx \l_xsr_egyptian_font_digest_tl
+        { \file_mdfive_hash:V \l_xsr_egyptian_font_path_tl }
+      \tl_if_empty:NT \l_xsr_egyptian_font_digest_tl
+        { \msg_fatal:nn { xsr } { font-changed } }
+      \tl_set:Nx \g_xsr_renderer_options_tl
+        {
+          \c_left_brace_str
+          "font_digest":"\l_xsr_egyptian_font_digest_tl",
+          "font_path":"\l_xsr_egyptian_font_path_tl"
+          \c_right_brace_str
+        }
+      \xsr_external_render:nn {#1} {#2}
+    \group_end:
+  }
+\cs_generate_variant:Nn \file_mdfive_hash:n { V }
+
+% Responses select the measured file explicitly, even in an unrelated ambient
+% font. Hash validation also protects offline/preprocessed responses.
+\NewDocumentCommand \xsrEgyptianUseFont { m m m m }
+  {
+    \group_begin:
+      \str_if_eq:eeF { \file_mdfive_hash:n {#1#2} } {#3}
+        { \msg_fatal:nn { xsr } { font-changed } }
+      \tex_font:D \l_xsr_egyptian_font = "[#1#2]"~at~\f@size pt\scan_stop:
+      \l_xsr_egyptian_font
+      #4
+    \group_end:
+  }
 
 \xsr_register_backend:nnn
   { egyptian }
-  { hieropy-0.1.4-basic-hv-layout-1 }
+  { font-metrics-basic-hv-1 }
   { xsr_egyptian_render:nn }
 
-% XSR coordinates use em units, x to the right and y down from the top. The
-% first layout baseline is the canvas bottom. Each glyph is centered in the
-% cell Hieropy assigned to it, but is selected and shaped by the current XeTeX
-% font; no Hieropy font or raster output enters this layer.
+% Top-origin ink positions. Subtract the actual left bearing and place the
+% baseline using yMax, rather than centering the advance/TeX line box.
 \dim_new:N \l_xsr_egyptian_layout_width_dim
 \dim_new:N \l_xsr_egyptian_layout_height_dim
 \dim_new:N \l_xsr_egyptian_layout_depth_dim
-
-\cs_new_protected:Npn \xsr_egyptian_glyph:nnnnnn #1#2#3#4#5#6
+\cs_new_protected:Npn \xsr_egyptian_glyph:nnnnnnnn #1#2#3#4#5#6#7#8
   {
     \rlap
       {
-        \kern #2 em
+        \kern \fp_eval:n { #2 - #6 * #7 } em
         \tex_raise:D
           \dim_eval:n
-            { \l_xsr_egyptian_layout_height_dim - #3 em - #5 em }
+            { \l_xsr_egyptian_layout_height_dim - \fp_eval:n { #3 + #6 * #8 } em }
           \hbox:n
             {
-              \vbox_to_ht:nn { #5 em }
-                {
-                  \vss
-                  \hbox_to_wd:nn { #4 em }
-                    {
-                      \hss
-                      \scalebox {#6}
-                        { \char_generate:nn { \int_from_hex:n {#1} } { 12 } }
-                      \hss
-                    }
-                  \vss
-                }
+              \scalebox{#6}
+                { \XeTeXglyph \XeTeXcharglyph \int_from_hex:n {#1} \scan_stop: }
             }
       }
   }
@@ -74,8 +108,8 @@
     \group_end:
   }
 
-\NewDocumentCommand \xsrEgyptianGlyph { m m m m m m }
-  { \xsr_egyptian_glyph:nnnnnn {#1} {#2} {#3} {#4} {#5} {#6} }
+\NewDocumentCommand \xsrEgyptianGlyph { m m m m m m m m }
+  { \xsr_egyptian_glyph:nnnnnnnn {#1} {#2} {#3} {#4} {#5} {#6} {#7} {#8} }
 \NewDocumentCommand \xsrEgyptianLayout { m m m m m }
   { \xsr_egyptian_layout:nnnnn {#1} {#2} {#3} {#4} {#5} }
 

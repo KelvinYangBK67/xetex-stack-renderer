@@ -1,141 +1,71 @@
-'''Hieropy 0.1.4 geometry boundary for the basic H/V subset.
+"""Generic ink-box packing for the basic Egyptian H/V subset."""
+from dataclasses import replace
 
-This module is the only XSR code that knows Hieropy's layout internals.
-``Fragment.format`` initializes and fits group scales. ``Horizontal.format``
-partitions the available x interval, while ``Vertical.format`` partitions y
-and accounts for nested vertical spaces. Their recursive ``format`` calls end
-at ``Literal.format``, which stores absolute ``x``, ``y``, ``w``, ``h`` and
-the inherited ``scale``. XSR snapshots those values into its own model.
-
-Hieropy 0.1.4 computes literal sizes through ``em_size_of`` and its bundled
-measurement font. That dependency affects geometry only: no Hieropy raster or
-font is emitted, and XeTeX remains responsible for selecting and shaping the
-actual output glyphs.
-'''
-
-from __future__ import annotations
-
-import math
-from collections.abc import Iterator
-
-from .model import GlyphPlacement, ParsedEgyptianRun, RenderResult
+from ..font_metrics import FontMetrics
+from .model import EgyptianNode, GlyphPlacement, ParsedEgyptianRun, RenderResult
 
 
 class EgyptianLayoutError(ValueError):
-    '''Raised when a parsed construct is outside the basic H/V subset.'''
+    """A construct is outside the basic H/V subset."""
 
 
-class HieropyLayout:
-    '''Convert a Hieropy Fragment into XSR-owned basic H/V geometry.'''
+class EgyptianLayout:
+    """Compose natural ink boxes, center children, then shrink each quadrat.
 
-    def __init__(self) -> None:
-        from hieropy import Options
-        from hieropy.unistructure import Fragment, Horizontal, Literal, Vertical
+    Each top-level group fits within one em of height without enlargement.
+    H/V gaps are 0.08 em before fitting; outer padding is 0.04 em. Plain
+    successive signs form independent quadrats. No reference-font geometry
+    or Hieropy layout methods enter this layer.
+    """
+    gap = 0.08
+    padding = 0.04
 
-        self._options_type = Options
-        self._fragment_type = Fragment
-        self._horizontal_type = Horizontal
-        self._literal_type = Literal
-        self._vertical_type = Vertical
-
-    def layout(self, parsed: ParsedEgyptianRun) -> RenderResult:
-        fragment = parsed.fragment
-        if not isinstance(fragment, self._fragment_type):
-            raise EgyptianLayoutError(
-                f'expected Hieropy Fragment, got {type(fragment).__name__}'
-            )
-        if not fragment.groups:
-            raise EgyptianLayoutError('empty Egyptian runs cannot be laid out')
-
-        self._validate_node(fragment)
-        options = self._options_type(
-            direction='hlr',
-            linesize=1.0,
-            sep=0.08,
-            hmargin=0.04,
-            vmargin=0.04,
-            align='middle',
-            separated=False,
-        )
-        fragment.format(options)
-        content_width, content_height = fragment.size(options)
-
-        # These are the same outer extents used by Fragment.print(), without
-        # constructing any of Hieropy's PIL/PDF/SVG printable objects.
-        width = content_width + options.sep + 2 * options.hmargin
-        total_height = content_height + options.sep + 2 * options.vmargin
-        glyphs = tuple(self._collect_literals(fragment))
-        if not glyphs:
-            raise EgyptianLayoutError('basic H/V layout produced no glyphs')
-
-        self._validate_geometry(width, total_height, glyphs)
-        return RenderResult(
-            width=width,
-            height=total_height,
-            depth=0.0,
-            glyphs=glyphs,
-        )
-
-    def _validate_node(self, node: object) -> None:
-        if isinstance(node, self._literal_type):
-            unsupported = []
-            if node.vs:
-                unsupported.append('rotation/variation')
-            if node.mirror:
-                unsupported.append('mirror')
-            if node.damage:
-                unsupported.append('damage')
-            if unsupported:
-                joined = ', '.join(unsupported)
-                raise EgyptianLayoutError(
-                    f'unsupported Literal feature(s): {joined}'
-                )
-            return
-
-        allowed_containers = (
-            self._fragment_type,
-            self._horizontal_type,
-            self._vertical_type,
-        )
-        if not isinstance(node, allowed_containers):
-            raise EgyptianLayoutError(
-                f'unsupported Hieropy group for basic H/V layout: '
-                f'{type(node).__name__}'
-            )
-        for child in node.groups:
-            self._validate_node(child)
-
-    def _collect_literals(self, node: object) -> Iterator[GlyphPlacement]:
-        if isinstance(node, self._literal_type):
-            yield GlyphPlacement(
-                codepoint=ord(node.ch),
-                x=float(node.x),
-                y=float(node.y),
-                width=float(node.w),
-                height=float(node.h),
-                scale=float(node.scale),
-            )
-            return
-        for child in node.groups:
-            yield from self._collect_literals(child)
+    def __init__(self, font: FontMetrics):
+        self.font = font
 
     @staticmethod
-    def _validate_geometry(
-        width: float,
-        total_height: float,
-        glyphs: tuple[GlyphPlacement, ...],
-    ) -> None:
-        values = [width, total_height]
-        for glyph in glyphs:
-            values.extend(
-                [glyph.x, glyph.y, glyph.width, glyph.height, glyph.scale]
-            )
-        if not all(math.isfinite(value) for value in values):
-            raise EgyptianLayoutError('Hieropy produced non-finite geometry')
-        if width <= 0 or total_height <= 0:
-            raise EgyptianLayoutError('Hieropy produced an empty layout box')
-        if any(
-            glyph.width <= 0 or glyph.height <= 0 or glyph.scale <= 0
-            for glyph in glyphs
-        ):
-            raise EgyptianLayoutError('Hieropy produced an empty glyph box')
+    def _transform(box: RenderResult, scale=1.0, x=0.0, y=0.0) -> RenderResult:
+        return RenderResult(
+            box.width * scale, box.height * scale, 0.0,
+            tuple(replace(g, x=x + g.x * scale, y=y + g.y * scale,
+                          width=g.width * scale, height=g.height * scale,
+                          scale=g.scale * scale) for g in box.glyphs),
+        )
+
+    def _pack(self, boxes: list[RenderResult], vertical: bool) -> RenderResult:
+        if not boxes:
+            raise EgyptianLayoutError('empty Egyptian groups cannot be laid out')
+        width = (max(b.width for b in boxes) if vertical else
+                 sum(b.width for b in boxes) + self.gap * (len(boxes) - 1))
+        height = (sum(b.height for b in boxes) + self.gap * (len(boxes) - 1)
+                  if vertical else max(b.height for b in boxes))
+        cursor = 0.0
+        glyphs = []
+        for box in boxes:
+            x = (width - box.width) / 2 if vertical else cursor
+            y = cursor if vertical else (height - box.height) / 2
+            glyphs.extend(self._transform(box, x=x, y=y).glyphs)
+            cursor += (box.height if vertical else box.width) + self.gap
+        return RenderResult(width, height, 0.0, tuple(glyphs))
+
+    def _node(self, node: EgyptianNode) -> RenderResult:
+        if node.kind == 'sign':
+            metric = self.font.glyph(node.codepoint)
+            return RenderResult(metric.width, metric.height, 0.0, (
+                GlyphPlacement(node.codepoint, 0, 0, metric.width, metric.height,
+                               1.0, metric.bounds[0], metric.bounds[3]),
+            ))
+        return self._pack([self._node(child) for child in node.children],
+                          node.kind == 'vertical')
+
+    def layout(self, parsed: ParsedEgyptianRun) -> RenderResult:
+        boxes = [self._node(child) for child in parsed.structure.children]
+        boxes = [self._transform(box, min(1.0, 1.0 / box.height)) for box in boxes]
+        packed = self._pack(boxes, False)
+        padded = self._transform(packed, x=self.padding, y=self.padding)
+        return replace(padded, width=packed.width + 2 * self.padding,
+                       height=packed.height + 2 * self.padding)
+
+
+# Compatibility name; this class no longer consumes Hieropy geometry.
+HieropyLayout = EgyptianLayout

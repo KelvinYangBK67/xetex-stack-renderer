@@ -11,7 +11,9 @@ def test_valid_ehfc_is_parsed_by_hieropy() -> None:
     assert isinstance(parsed, ParsedEgyptianRun)
     assert parsed.text == text
     assert parsed.parser_version == '0.1.4'
-    assert type(parsed.fragment).__name__ == 'Fragment'
+    assert parsed.structure.kind == 'run'
+    assert parsed.structure.children[0].kind == 'horizontal'
+    assert [n.codepoint for n in parsed.structure.children[0].children] == [0x13000, 0x13050]
 
 
 def test_invalid_ehfc_raises_xsr_parse_error() -> None:

@@ -1,101 +1,102 @@
+import math
 import pytest
+from xsr.egyptian import EgyptianLayoutError, GlyphPlacement, HieropyAdapter, RenderResult, serialize_tex_layout
 
-from xsr.egyptian import (
-    EgyptianLayoutError,
-    GlyphPlacement,
-    HieropyAdapter,
-    RenderResult,
-    serialize_tex_layout,
-)
+A, B, C = map(chr, (0x13000, 0x13050, 0x13153))
+H, V, BEGIN, END = map(chr, (0x13431, 0x13430, 0x13437, 0x13438))
 
 
-A = chr(0x13000)
-B = chr(0x13050)
-C = chr(0x13153)
-H = chr(0x13431)
-V = chr(0x13430)
-BEGIN = chr(0x13437)
-END = chr(0x13438)
+def assert_contained(result):
+    assert result.width > 0 and result.height > 0 and result.depth == 0
+    for g in result.glyphs:
+        assert all(math.isfinite(v) for v in (g.x, g.y, g.width, g.height, g.scale))
+        assert g.width > 0 and g.height > 0 and g.scale > 0
+        assert g.x >= 0 and g.y >= 0
+        assert g.x + g.width <= result.width + 1e-9
+        assert g.y + g.height <= result.height + 1e-9
+    for i, a in enumerate(result.glyphs):
+        for b in result.glyphs[i + 1:]:
+            assert (a.x + a.width <= b.x or b.x + b.width <= a.x or
+                    a.y + a.height <= b.y or b.y + b.height <= a.y)
 
 
-def test_single_sign_geometry() -> None:
-    result = HieropyAdapter().layout(A)
-
-    assert result.width == pytest.approx(0.86)
-    assert result.height == pytest.approx(1.16)
-    assert result.depth == 0
-    assert result.glyphs == (
-        GlyphPlacement(
-            codepoint=0x13000,
-            x=pytest.approx(0.08),
-            y=pytest.approx(0.08),
-            width=pytest.approx(0.7),
-            height=pytest.approx(1.0),
-            scale=pytest.approx(1.0),
-        ),
-    )
+def test_single_sign_geometry(font):
+    result = HieropyAdapter().layout(A, font)
+    metric = font.glyph(ord(A))
+    g, = result.glyphs
+    assert g.width == pytest.approx(metric.width * g.scale)
+    assert g.height == pytest.approx(metric.height * g.scale)
+    assert g.ink_left == metric.bounds[0]
+    assert g.ink_top == metric.bounds[3]
+    assert g.x == pytest.approx(0.04) and g.y == pytest.approx(0.04)
+    assert result.width == pytest.approx(g.width + 0.08)
+    assert result.height == pytest.approx(g.height + 0.08)
+    assert_contained(result)
 
 
-def test_horizontal_joiner_geometry() -> None:
-    result = HieropyAdapter().layout(A + H + B)
+def test_horizontal_joiner_geometry(font):
+    result = HieropyAdapter().layout(A + H + B, font)
     first, second = result.glyphs
-
-    assert [glyph.codepoint for glyph in result.glyphs] == [0x13000, 0x13050]
+    assert [g.codepoint for g in result.glyphs] == [ord(A), ord(B)]
     assert first.x + first.width < second.x
-    assert first.y == pytest.approx(second.y)
-    assert first.scale == pytest.approx(1.0)
-    assert second.scale == pytest.approx(1.0)
+    assert first.y + first.height / 2 == pytest.approx(second.y + second.height / 2)
+    assert first.scale == pytest.approx(second.scale)
+    assert_contained(result)
 
 
-def test_vertical_joiner_geometry() -> None:
-    result = HieropyAdapter().layout(A + V + B)
+def test_vertical_joiner_geometry(font):
+    result = HieropyAdapter().layout(A + V + B, font)
     first, second = result.glyphs
-
-    assert [glyph.codepoint for glyph in result.glyphs] == [0x13000, 0x13050]
+    assert [g.codepoint for g in result.glyphs] == [ord(A), ord(B)]
     assert first.y + first.height < second.y
+    assert first.x + first.width / 2 == pytest.approx(second.x + second.width / 2)
     assert first.scale == pytest.approx(second.scale)
     assert 0 < first.scale < 1
-    assert result.height == pytest.approx(1.16)
+    assert result.height <= 1.08 + 1e-9
+    assert_contained(result)
 
 
-def test_nested_horizontal_and_vertical_geometry() -> None:
-    vertical_outer = HieropyAdapter().layout(A + H + B + V + C)
+def test_nested_horizontal_and_vertical_geometry(font):
+    vertical_outer = HieropyAdapter().layout(A + H + B + V + C, font)
     h_first, h_second, bottom = vertical_outer.glyphs
-    assert h_first.y == pytest.approx(h_second.y)
-    assert h_first.x < h_second.x
-    assert h_first.y + h_first.height < bottom.y
-
-    horizontal_outer = HieropyAdapter().layout(
-        A + H + BEGIN + B + V + C + END
-    )
+    assert h_first.y + h_first.height / 2 == pytest.approx(h_second.y + h_second.height / 2)
+    assert h_first.x + h_first.width < h_second.x
+    assert max(g.y + g.height for g in (h_first, h_second)) < bottom.y
+    assert_contained(vertical_outer)
+    horizontal_outer = HieropyAdapter().layout(A + H + BEGIN + B + V + C + END, font)
     left, v_first, v_second = horizontal_outer.glyphs
-    assert left.x + left.width < v_first.x
+    assert left.x + left.width < min(v_first.x, v_second.x)
     assert v_first.y + v_first.height < v_second.y
+    assert_contained(horizontal_outer)
 
 
-def test_geometry_serializes_to_xetex_layout_commands() -> None:
-    result = RenderResult(
-        width=1.5,
-        height=1.2,
-        depth=0.0,
-        glyphs=(
-            GlyphPlacement(
-                codepoint=0x13000,
-                x=0.1,
-                y=0.2,
-                width=0.7,
-                height=0.8,
-                scale=0.75,
-            ),
-        ),
-    )
-
+def test_geometry_serializes_to_xetex_layout_commands():
+    result = RenderResult(1.5, 1.2, 0.0, (GlyphPlacement(0x13000, 0.1, 0.2, 0.7, 0.8, 0.75, -0.1, 0.9),))
     assert serialize_tex_layout(result) == (
         r'\xsrEgyptianLayout{1.5}{1.2}{0}{1}'
-        r'{\xsrEgyptianGlyph{13000}{0.1}{0.2}{0.7}{0.8}{0.75}}'
-    )
+        r'{\xsrEgyptianGlyph{13000}{0.1}{0.2}{0.7}{0.8}{0.75}{-0.1}{0.9}}')
 
 
-def test_unsupported_overlay_is_not_silently_rendered() -> None:
+def test_unsupported_overlay_is_not_silently_rendered(font):
     with pytest.raises(EgyptianLayoutError, match='Overlay'):
-        HieropyAdapter().layout(A + chr(0x13436) + B)
+        HieropyAdapter().layout(A + chr(0x13436) + B, font)
+
+
+def test_hieropy_geometry_is_never_used(monkeypatch, font):
+    from hieropy.unistructure import Fragment, Horizontal, Literal, Vertical
+    def forbidden(*args, **kwargs):
+        pytest.fail('Hieropy geometry was used')
+    for cls in (Fragment, Horizontal, Literal, Vertical):
+        monkeypatch.setattr(cls, 'size', forbidden)
+        monkeypatch.setattr(cls, 'format', forbidden)
+    assert_contained(HieropyAdapter().layout(A + H + B + V + C, font))
+
+
+def test_showcase_sequences_have_contained_disjoint_ink(font):
+    from pathlib import Path
+    from xsr import build_default_registry
+    source = (Path(__file__).resolve().parents[1] / 'examples/font-metrics-showcase.tex').read_text(encoding='utf-8')
+    sequences = {run.text for run in build_default_registry().script_runs(source)}
+    assert len(sequences) >= 12
+    for text in sequences:
+        assert_contained(HieropyAdapter().layout(text, font))
