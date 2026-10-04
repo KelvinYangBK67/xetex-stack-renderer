@@ -1,4 +1,4 @@
-﻿"""Cross-font EHFC semantics; assertions concern ink and relationships."""
+"""Cross-font EHFC semantics; assertions concern ink and relationships."""
 import math
 from dataclasses import replace
 import pytest
@@ -63,21 +63,21 @@ def test_insertion_regions_use_actual_empty_ink(font,slot,cps):
     (0x13258,0x1343C,0x13153,0x1343D,0x1325B),
     (0x1343C,0x13153,0x1343D),
     (0x13000,0x13440,0x13455),
-    (0x13153,0xFE00,0x13440),
+    (0x1310F,0xFE00,0x13440),
     (0x13441,0x13442,0x13443,0x13444,0x13445,0x13446),
 ])
 def test_advanced_combinations(font,cps):
     contained(HieropyAdapter().layout(text(*cps),font))
 
 
-@pytest.mark.parametrize('selector,angle',[(0xFE00,90),(0xFE01,180),(0xFE02,270),(0xFE03,45),(0xFE04,135),(0xFE05,225),(0xFE06,315)])
-def test_rotation_and_mirror(font,selector,angle):
-    r=HieropyAdapter().layout(text(0x13153,selector,0x13440),font)
+@pytest.mark.parametrize('base,selector,angle',[(0x1310F,0xFE00,90),(0x13093,0xFE01,180),(0x13117,0xFE02,270),(0x13139,0xFE03,45),(0x13012,0xFE03,30),(0x130B8,0xFE03,25),(0x13139,0xFE06,315)])
+def test_rotation_and_mirror(font,base,selector,angle):
+    r=HieropyAdapter().layout(text(base,selector,0x13440),font)
     g,=r.glyphs
     assert g.rotation==angle and g.mirror
     contained(r)
     if angle in (90,270):
-        original=font.glyph(0x13153)
+        original=font.glyph(base)
         assert g.width/g.height==pytest.approx(original.height/original.width)
 
 
@@ -103,9 +103,9 @@ def test_advanced_parser_never_uses_hieropy_geometry(font,monkeypatch):
 
 
 @pytest.mark.parametrize('cps,match',[
-    ((0x13443,0xFE00),'continuous lost-sign'),
+    ((0x13443,0xFE01),'lost signs only support'),
     ((0x13379,0x1343C,0x13000,0x1343F,0x13287),'mismatched enclosure'),
-    ((0x13259,0x1343C,0x13000,0x1343D,0x1325D),'delimiter combination'),
+    ((0x13288,0x1343C,0x13000,0x1343D,0x1325D),'control family'),
 ])
 def test_unsupported_semantics_fail_explicitly(font,cps,match):
     with pytest.raises(ValueError,match=match):

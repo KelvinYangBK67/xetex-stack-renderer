@@ -83,9 +83,10 @@ def test_overlay_centers_actual_ink(font):
     assert first.x + first.width/2 == pytest.approx(second.x + second.width/2)
     assert first.y + first.height/2 == pytest.approx(second.y + second.height/2)
 
-def test_unsupported_delimiter_damage_is_explicit(font):
-    with pytest.raises(EgyptianLayoutError, match='damaged enclosure delimiters'):
-        HieropyAdapter().layout(chr(0x13379)+chr(0x13447)+chr(0x1343C)+A+chr(0x1343D)+chr(0x1337A),font)
+def test_delimiter_damage_is_rendered(font):
+    result=HieropyAdapter().layout(chr(0x13379)+chr(0x13447)+chr(0x1343C)+A+chr(0x1343D)+chr(0x1337A),font)
+    assert result.decorations[0].kind=='cartouche'
+    assert any(d.kind=='shade' for d in result.decorations)
 
 
 def test_hieropy_geometry_is_never_used(monkeypatch, font):

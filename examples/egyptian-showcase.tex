@@ -19,7 +19,7 @@
   \newcommand\samplerow[3]{#1\par{\scriptsize\ttfamily #2} & \sample{\FontOne}{#3} & \sample{\FontTwo}{#3}\\[15pt]}
 \fi
 \begin{document}
-{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.5}\par\smallskip
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.6}\par\smallskip
 {\large 01 / Signs and composition}\par\medskip
 Natural outline proportions, centered H/V groups and stable nesting.\par\medskip
 \begin{comparison}\tablehead
@@ -33,7 +33,7 @@ Natural outline proportions, centered H/V groups and stable nesting.\par\medskip
 \end{comparison}\vfill
 {\small\color{ink}\textbf{Inspection notes}}\par\smallskip\small Identical Unicode in every column. Frames show the computed layout extent. H = U+13431; V = U+13430. Parentheses describe the structure, not literal punctuation.
 \newpage
-{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.5}\par\smallskip
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.6}\par\smallskip
 {\large 02 / Outline-aware insertion}\par\medskip
 Each inset is placed in a measured empty region of the host outline.\par\medskip
 \begin{comparison}\tablehead
@@ -47,7 +47,7 @@ Each inset is placed in a measured empty region of the host outline.\par\medskip
 \end{comparison}\vfill
 {\small\color{ink}\textbf{Inspection notes}}\par\smallskip\small Inset locations come from scan-converted outlines with a collision margin. Shapes with no usable cavity fail explicitly; no font-specific insertion coordinates or alternate glyph recipes are used.
 \newpage
-{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.5}\par\smallskip
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.6}\par\smallskip
 {\large 03 / Overlays and enclosures}\par\medskip
 Overlays share ink centers. Vector enclosures grow around actual content.\par\medskip
 \begin{comparison}\tablehead
@@ -59,21 +59,60 @@ Overlays share ink centers. Vector enclosures grow around actual content.\par\me
 \samplerow{Missing enclosure ends}{Bare U+1343C..D}{𓐼𓀀𓅓𓐽}
 \samplerow{Enclosed insertion}{Cartouche with F4 + X1}{𓍹𓐼𓄂𓐲𓏏𓐽𓍺}
 \end{comparison}\vfill
-{\small\color{ink}\textbf{Inspection notes}}\par\smallskip\small Common cartouche, rectangular and walled end pairs are drawn by XSR. Missing end delimiters leave that end open. Overlay overlap is intentional. Ornate delimiter variants remain unsupported.
+{\small\color{ink}\textbf{Inspection notes}}\par\smallskip\small Common cartouche, rectangular and walled end pairs are drawn by XSR. Missing end delimiters leave that end open. Overlay overlap is intentional. Alternate endpoints use outlines from the selected font; common ends remain vectors.
 \newpage
-{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.5}\par\smallskip
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.6}\par\smallskip
 {\large 04 / Transforms, damage and combinations}\par\medskip
 Rotation precedes mirroring. Hatching marks damaged or missing text.\par\medskip
 \begin{comparison}\tablehead
 \samplerow{Mirror}{A1 / U+13440}{𓀀𓑀}
 \samplerow{Quarter turn}{V26 / VS1 / 90 degrees clockwise}{𓎙︀}
-\samplerow{Diagonal turn}{V28 / VS4 / 45 degrees clockwise}{𓎛︃}
-\samplerow{Rotate, then mirror}{G17 / VS1 / U+13440}{𓅓︀𓑀}
+\samplerow{Diagonal turn}{F51 / VS4 / 45 degrees clockwise}{𓄹︃}
+\samplerow{Rotate, then mirror}{F16 / VS1 / U+13440}{𓄏︀𓑀}
 \samplerow{Partial damage}{A1 / U+1344B / top half}{𓀀𓑋}
 \samplerow{Full damage}{G17 / U+13455}{𓅓𓑕}
 \samplerow{Lost signs}{Full / half / tall / wide}{𓑃𓑄𓑅𓑆}
 \samplerow{Nested insertion}{F4 top-left (D28 top J1)}{𓄂𓐲𓐷𓂓𓐺𓐍𓐸}
 \samplerow{Insertion plus H/V}{I10 bottom-left A1, beside G17}{𓆓𓐳𓀀𓐱𓅓}
 \end{comparison}\vfill
-{\small\color{ink}\textbf{Inspection notes}}\par\smallskip\small Normal compatible outline fonts use one code path. Rotation selectors are applied geometrically, not as font-specific variants. Continuous lost-sign shading and damaged enclosure end caps are not implemented.
+{\small\color{ink}\textbf{Inspection notes}}\par\smallskip\small Normal compatible outline fonts use one code path. Rotation selectors are applied geometrically, not as font-specific variants. Only registered sign + selector pairs rotate. Unregistered pairs are diagnosed explicitly.
+
+
+\newpage
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.6}\par\smallskip
+{\large 05 / Standardized rotation and horizontal RTL}\par\medskip
+The same selector means different angles for different signs. RTL reverses logical start/end.\par\medskip
+\begin{comparison}\tablehead
+\samplerow{VS4: 30 degrees}{A15 + FE03}{𓀒︃}
+\samplerow{VS4: 25 degrees}{H6 + FE03}{𓆄︃}
+\samplerow{VS4: 40 degrees}{F44 + FE03}{𓄯︃}
+\samplerow{VS4: 15 degrees}{Aa11 + FE03}{𓐙︃}
+\samplerow{LTR: A1, B1, G17}{Logical order, separate quadrats}{𓀀𓁐𓅓}
+\samplerow{RTL: A1, B1, G17}{Read from the right}{\xsrEgyptianDirection{rtl}𓀀𓁐𓅓}
+\samplerow{RTL top-start}{Insertion is now on the right}{\xsrEgyptianDirection{rtl}𓄂𓐲𓏏}
+\samplerow{RTL top-end}{Insertion is now on the left}{\xsrEgyptianDirection{rtl}𓂇𓐴𓏏}
+\samplerow{RTL rotation + mirror}{F16 / FE00 / U+13440}{\xsrEgyptianDirection{rtl}𓄏︀𓑀}
+\end{comparison}\vfill
+{\small\color{ink}\textbf{Semantic policy}}\par\smallskip\small Unicode 17 standardized variants determine angles. Explicit NoMirror violations and unregistered NoRotate variants are errors. Registered angle-specific variants take precedence over the broad NoRotate property. Full vertical text flow is reserved; V JOINER within a quadrat remains supported.
+\newpage
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.6}\par\smallskip
+{\large 06 / Editorial marks, continuous loss and line wrapping}\par\medskip
+Brackets use explicit Egyptian context; ordinary punctuation retains its normal TeX meaning.\par\medskip
+\begin{comparison}\tablehead
+\samplerow{Square / partial brackets}{Destruction and partial destruction}{\xsrEgyptianText{[𓀀]⸢𓁐⸣}}
+\samplerow{Angle / double brackets}{Addition and ancient deletion}{\xsrEgyptianText{⟨𓀀⟩⟦𓁐⟧}}
+\samplerow{Editorial braces}{Deletion, within explicit context}{\xsrEgyptianText{{𓀀𓐱𓁐}}}
+\samplerow{Continuous lost signs}{Lost + FE00 / adjoining regions}{𓑃︀𓑄︀𓑅︀𓑆︀}
+\samplerow{Damaged start, open end}{Cartouche cap + damage}{𓍹𓑋𓐼𓀀𓐽}
+\samplerow{RTL open end}{Logical opening is on the right}{\xsrEgyptianDirection{rtl}𓍹𓐼𓀀𓐽}
+\samplerow{Alternate endpoints}{O6b / O6f, selected-font outlines}{𓉙𓐼𓀀𓐽𓉝}
+\end{comparison}\par\medskip
+{\color{ink}\textbf{Paragraph wrapping / atomic H quadrats}}\par\smallskip
+\newcommand\wrapsample[2]{\begin{minipage}[t]{.30\linewidth}\small #2\par\smallskip{#1\fontsize{18}{23}\selectfont\raggedright
+𓀀𓐱𓁐𓅓𓀀𓐱𓁐𓅓𓀀𓐱𓁐𓅓𓀀𓐱𓁐𓅓\par}
+\small RTL (same logical input)\par\smallskip{#1\fontsize{18}{23}\selectfont\raggedleft\xsrEgyptianDirection{rtl}
+𓀀𓐱𓁐𓅓𓀀𓐱𓁐𓅓𓀀𓐱𓁐𓅓𓀀𓐱𓁐𓅓\par}\end{minipage}}
+\wrapsample{\FontOne}{\NameOne}\hfill\wrapsample{\FontTwo}{\NameTwo}\ifnum\XSRFontCount=3\hfill\wrapsample{\FontThree}{\NameThree}\fi
+\vfill
+{\small\color{ink}\textbf{Inspection notes}}\par\smallskip\small TeX can break between quadrats; the A1--B1 H group stays together. Expanded shading meets without white gaps. NoMirror prohibits explicit mirroring that changes identity; RTL orientation is independent. Contextual GSUB alternates remain a future font-quality enhancement.
 \end{document}

@@ -76,13 +76,17 @@ def preprocess(args):
                 resolved = workdir / resolved
             # Preserve the literal spelling for TeX request identity.
             selections[spelling] = resolved.resolve()
+    directions=['ltr','rtl'] if any('xsrEgyptianDirection' in source for _,source in sources.values()) else ['ltr']
     profiles = []
     for spelling,resolved in sorted(selections.items()):
         options = font_options(resolved, spelling=spelling)
-        profiles.append((options,font_options(resolved)))
+        for direction in directions:
+            extra={'direction':'rtl'} if direction=='rtl' else {}
+            profiles.append((options | extra,font_options(resolved) | extra))
     runs, emitted = [], set()
     for path,(raw,source) in sources.items():
-        for run in registry.script_runs(source):
+        from .egyptian.source import source_runs
+        for run in source_runs(source,registry):
             if not profiles:
                 raise XSRError('XSR-FONT-NOT-SELECTED', 'select a font in the source or supply --font')
             version = renderer.backend_version(run.script)

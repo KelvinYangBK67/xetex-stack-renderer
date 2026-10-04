@@ -2,7 +2,7 @@
 \ProvidesExplPackage
   {xsr-egyptian}
   {2026-10-03}
-  {0.5}
+  {0.6}
   {Egyptian backend registration for xetex-stack-renderer}
 
 \RequirePackage{xsr-core}
@@ -11,6 +11,24 @@
 
 \ExplSyntaxOn
 
+
+
+\tl_new:N \l_xsr_egyptian_direction_tl
+\tl_set:Nn \l_xsr_egyptian_direction_tl {ltr}
+\msg_new:nnn {xsr}{direction}{[XSR-DIRECTION]~Use~ltr~or~rtl.}
+\msg_new:nnn {xsr}{writing-mode}{[XSR-WRITING-MODE-UNSUPPORTED]~Only~horizontal~text~flow~is~implemented.}
+\NewDocumentCommand \xsrEgyptianDirection {m}
+  {\str_case:nnF{#1}{{ltr}{\tl_set:Nn\l_xsr_egyptian_direction_tl{ltr}}{rtl}{\tl_set:Nn\l_xsr_egyptian_direction_tl{rtl}}}{\msg_fatal:nn{xsr}{direction}}}
+\NewDocumentCommand \xsrEgyptianWritingMode {m}
+  {\str_if_eq:nnF{#1}{horizontal}{\msg_fatal:nn{xsr}{writing-mode}}}
+% Explicit Egyptian context preserves ordinary punctuation catcodes everywhere.
+% Nested literal braces in this argument represent editorial braces.
+\NewDocumentCommand \xsrEgyptianText {m}
+  {\exp_args:Nnx \xsr_dispatch_run:nn{egyptian}{\tl_to_str:n{#1}}}
+\TeXXeTstate=1\relax
+\NewDocumentCommand \xsrEgyptianFlow {m m}
+  {\mode_leave_vertical:\str_if_eq:nnTF{#1}{rtl}{\beginR #2\endR}{#2}}
+\NewDocumentCommand \xsrEgyptianBreak {m}{\penalty0\relax}
 
 \tl_new:N \l_xsr_egyptian_font_path_tl
 \tl_new:N \l_xsr_egyptian_font_digest_tl
@@ -70,6 +88,7 @@
       \tl_set:Nx \g_xsr_renderer_options_tl
         {
           \c_left_brace_str
+          \str_if_eq:VnT \l_xsr_egyptian_direction_tl {rtl} {"direction":"rtl",}
           "font_codepoints":"\l_xsr_egyptian_font_codepoints_tl",
           "font_digest":"\l_xsr_egyptian_font_digest_tl"
           \c_right_brace_str
@@ -95,7 +114,7 @@
 
 \xsr_register_backend:nnn
   { egyptian }
-  { font-aware-ehfc-0.5 }
+  { font-aware-ehfc-0.6 }
   { xsr_egyptian_render:nn }
 
 % Top-origin ink positions. Subtract the actual left bearing and place the
@@ -142,13 +161,13 @@
       \dim_set:Nn \l_xsr_egyptian_layout_height_dim {#2\l_xsr_egyptian_em_dim}
       \iow_term:x{XSR-LAYOUT~script=egyptian~glyphs=#4~width=#1~height=#2~depth=#3}
       \mode_leave_vertical:
-      \pgfpicture
+      \hbox{\beginL\pgfpicture
         \pgfpathrectangle{\pgfpointorigin}{\xsrEgyptianPoint{#1}{#2}}
         \pgfusepath{use~as~bounding~box}
         \pgfinterruptboundingbox
           #5
         \endpgfinterruptboundingbox
-      \endpgfpicture
+      \endpgfpicture\endL}
     \group_end:
   }
 \NewDocumentCommand \xsrEgyptianGlyph { m m m m m m m m }
@@ -163,7 +182,7 @@
     \xsr_active_detector_register:nn
       { egyptian }
       { 13000-1342F, 13430-1345F, 13460-143FF }
-    \xsr_active_detector_register_suffix:nnn {egyptian}{"FE00}{"FE06}
+    \xsr_active_detector_register_suffix:nnn {egyptian}{"FE00}{"FE0F}
   }
 
 \ExplSyntaxOff

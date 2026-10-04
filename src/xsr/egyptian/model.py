@@ -1,4 +1,4 @@
-﻿"""Immutable Egyptian semantics and top-origin em geometry owned by XSR."""
+"""Immutable Egyptian semantics and top-origin em geometry owned by XSR."""
 from dataclasses import dataclass
 
 
@@ -12,6 +12,9 @@ class EgyptianNode:
     damage: int = 0
     slots: tuple[str, ...] = ()
     size: tuple[float, float] = (0, 0)
+    continuous: bool = False
+    endpoint_damage: tuple[int, int] = (0, 0)
+    endpoint_codepoints: tuple[int | None, int | None] = (None, None)
     enclosure: str = ''
     ends: tuple[bool, bool] = (True, True)
 
@@ -47,6 +50,8 @@ class Decoration:
     height: float
     stroke: float = 0.018
     ends: tuple[bool, bool] = (True, True)
+    mirror: bool = False
+    phase: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -67,3 +72,4 @@ class RenderResult:
     glyphs: tuple[GlyphPlacement, ...]
     decorations: tuple[Decoration, ...] = ()
     insertions: tuple[InsertionRegion, ...] = ()
+    continuous: bool = False

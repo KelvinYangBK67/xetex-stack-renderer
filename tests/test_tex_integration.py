@@ -284,7 +284,7 @@ def test_advanced_ehfc_integration(tmp_path,font):
         text(0x1309D,0x13436,0x1339B),
         text(0x13379,0x1343C,0x13000,0x13431,0x13153,0x1343D,0x1337A),
         text(0x13286,0x1343E,0x13153,0x1343F,0x13287),
-        text(0x13153,0xFE00,0x13440),
+        text(0x1310F,0xFE00,0x13440),
         text(0x13000,0x13447),text(0x13000,0x13455),text(0x13443),
     ]
     result=run_xelatex(tmp_path,' '.join('{'+case+'}' for case in cases),
@@ -383,3 +383,95 @@ def test_failed_invocation_cannot_reuse_old_response(tmp_path):
     assert result.returncode!=0
     assert 'XSR-INVOCATION' in result.stdout
     assert 'STALE-WAS-USED' not in result.stdout
+
+@pytest.mark.skipif(shutil.which('xelatex') is None, reason='xelatex is unavailable')
+@pytest.mark.parametrize('direction',['ltr','rtl'])
+def test_horizontal_quadrat_wrapping(tmp_path,direction):
+    import fitz
+    # Two signs joined with H form one atomic box; adjacent copies may break.
+    quadrat=A+H+B
+    body=(r'\noindent\begin{minipage}{65pt}\raggedright\fontsize{20}{26}\selectfont'
+          +fr'\xsrEgyptianDirection{{{direction}}}'+quadrat*16+r'\par\end{minipage}')
+    result=run_xelatex(tmp_path,body)
+    assert result.returncode==0,result.stdout
+    assert 'Overfull' not in result.stdout
+    assert result.stdout.count('XSR-LAYOUT script=egyptian glyphs=2')==16
+    assert 'TeXXeT' not in result.stdout or 'error' not in result.stdout.lower()
+    with fitz.open(tmp_path/'integration.pdf') as pdf:
+        chars=[c for page in pdf for block in page.get_text('rawdict')['blocks'] if 'lines' in block
+               for line in block['lines'] for span in line['spans'] for c in span['chars'] if c['c'] in (A,B)]
+    assert len(chars)==32
+    rows={round(c['origin'][1],1) for c in chars}
+    assert len(rows)>=4
+    for y in rows:
+        row=sorted((c for c in chars if round(c['origin'][1],1)==y),key=lambda c:c['bbox'][0])
+        expected=(A+B) if direction=='ltr' else (B+A)
+        assert ''.join(c['c'] for c in row)==expected*(len(row)//2)
+
+
+@pytest.mark.skipif(shutil.which('xelatex') is None, reason='xelatex is unavailable')
+def test_editorial_host_context_and_ordinary_punctuation(tmp_path):
+    body='Latin [ordinary] {group} '+r'\xsrEgyptianText{['+A+H+B+']}'+' '+r'\xsrEgyptianText{{'+A+'}}'
+    result=run_xelatex(tmp_path,body)
+    assert result.returncode==0,result.stdout
+    assert result.stdout.count('path=real-layout')==2
+    responses=''.join(p.read_text(encoding='utf-8') for p in tmp_path.glob('*.xsr-*.tex'))
+    assert responses.count(r'\xsrEgyptianDecoration')==4
+    import fitz
+    with fitz.open(tmp_path/'integration.pdf') as pdf:
+        assert 'Latin [ordinary] group' in pdf[0].get_text()
+
+
+@pytest.mark.skipif(shutil.which('xelatex') is None, reason='xelatex is unavailable')
+def test_explicit_vertical_mode_has_typed_error(tmp_path):
+    result=run_xelatex(tmp_path,r'\xsrEgyptianWritingMode{vertical}'+A)
+    assert result.returncode!=0
+    assert 'XSR-WRITING-MODE-UNSUPPORTED' in result.stdout
+
+
+@pytest.mark.skipif(shutil.which('xelatex') is None, reason='xelatex is unavailable')
+def test_06_features_and_rtl_preprocess(tmp_path):
+    from conftest import NEW_GARDINER
+    from xsr.renderer import main
+    source=tmp_path/'integration.tex'
+    body=(r'\documentclass{article}\usepackage[mode=preprocess]{xetex-stack-renderer}'
+          +fr'\xsrEgyptianDefaultFont{{{NEW_GARDINER.as_posix()}}}'
+          +r'\begin{document}\xsrEgyptianDirection{rtl}\xsrEgyptianText{['+A+H+B+']}'
+          +' '+chr(0x13443)+chr(0xFE00)+chr(0x13443)+chr(0xFE00)
+          +' '+chr(0x13379)+chr(0x13447)+chr(0x1343C)+A+chr(0x1343D)
+          +r'\end{document}')
+    source.write_text(body,encoding='utf-8')
+    assert main(['preprocess','--input',str(source),'--output-dir',str(tmp_path)])==0
+    env=os.environ.copy()
+    env['TEXINPUTS']=str(ROOT/'tex')+os.pathsep
+    result=subprocess.run(['xelatex','-no-shell-escape','-interaction=nonstopmode','-halt-on-error',source.name],
+                          cwd=tmp_path,env=env,capture_output=True,text=True,encoding='utf-8',errors='replace')
+    assert result.returncode==0,result.stdout
+    assert result.stdout.count('path=real-layout')==3
+    assert not list(tmp_path.glob('*.req'))
+
+@pytest.mark.skipif(shutil.which('xelatex') is None, reason='xelatex is unavailable')
+@pytest.mark.parametrize('direction',['ltr','rtl'])
+def test_quadrat_breaks_add_no_spacing(tmp_path,direction):
+    from conftest import NEW_GARDINER
+    from xsr.font_metrics import load_font
+    from xsr.egyptian import HieropyAdapter
+    body=fr'\xsrEgyptianDirection{{{direction}}}\setbox0=\hbox{{'+A+B+C+r'}\typeout{XSR-WIDTH=\the\wd0}\box0'
+    result=run_xelatex(tmp_path,body)
+    assert result.returncode==0,result.stdout
+    measured=float(re.search(r'XSR-WIDTH=([0-9.]+)pt',result.stdout).group(1))
+    expected=10*HieropyAdapter().layout(A+B+C,load_font(NEW_GARDINER),direction=direction).width
+    assert measured==pytest.approx(expected,abs=.002)
+
+
+@pytest.mark.skipif(shutil.which('xelatex') is None, reason='xelatex is unavailable')
+@pytest.mark.parametrize('sequence,code',[
+    (chr(0x130BB)+chr(0x13440),'XSR-NO-MIRROR'),
+    (chr(0x13021)+chr(0xFE00),'XSR-NO-ROTATE'),
+    (A+chr(0xFE07),'XSR-VARIANT-UNREGISTERED'),
+])
+def test_unicode_semantic_errors_reach_tex(tmp_path,sequence,code):
+    result=run_xelatex(tmp_path,sequence)
+    assert result.returncode!=0
+    assert code in result.stdout
+    assert 'Traceback' not in result.stdout

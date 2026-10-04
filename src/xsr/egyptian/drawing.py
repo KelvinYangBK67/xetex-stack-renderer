@@ -19,8 +19,24 @@ def decoration_tex(dec):
         body=r'\pgfpathrectangle{\pgfpointorigin}{'+point(w,h)+r'}\pgfusepath{clip}\pgfsetstrokecolor{gray}'
         step=.075
         for i in range(-math.ceil(h/step),math.ceil(w/step)+1):
-            x=i*step
+            x=i*step - ((dec.x+dec.y+dec.height+dec.phase) % step)
             body+=move(x,0)+line(x+h,h)
+    elif dec.kind.startswith('bracket-'):
+        cp=int(dec.kind.split('-')[1])
+        closing=cp in (0x5D,0x7D,0x27E9,0x27E7,0x2E23)
+        x0,x1=(w-t,t) if closing else (t,w-t)
+        if cp in (0x27E8,0x27E9):
+            body=move(x1,t)+line(x0,h/2)+line(x1,h-t)
+        elif cp in (0x7B,0x7D):
+            mid=(x0+x1)/2
+            body=move(x1,t)+curve(x0,t,x1,h*.4,x0,h/2)+curve(x1,h*.6,x0,h-t,x1,h-t)
+        else:
+            bottom=h/2 if cp in (0x2E22,0x2E23) else t
+            body=move(x1,h-t)+line(x0,h-t)+line(x0,bottom)
+            if bottom==t:
+                body+=line(x1,t)
+            if cp in (0x27E6,0x27E7):
+                body+=move((x0+x1)/2,t)+line((x0+x1)/2,h-t)
     elif dec.kind=='cartouche':
         r=(h-2*t)/2
         left,right=t+r,w-t-r
@@ -52,4 +68,6 @@ def decoration_tex(dec):
     else:
         raise ValueError(f'unknown decoration {dec.kind}')
     body+=r'\pgfusepath{stroke}'
+    if dec.mirror:
+        body=r'\pgftransformshift{'+point(w,0)+r'}\pgftransformxscale{-1}'+body
     return r'\xsrEgyptianDecoration'+''.join('{'+n(v)+'}' for v in (dec.x,dec.y,dec.height,dec.stroke))+'{'+body+'}'
