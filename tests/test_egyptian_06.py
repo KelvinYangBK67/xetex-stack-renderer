@@ -1,7 +1,7 @@
 """Unicode-driven 0.6 semantics and horizontal layout contracts."""
 from dataclasses import replace
 import pytest
-from xsr.egyptian import HieropyAdapter
+from xsr.egyptian import EgyptianParser
 from xsr.egyptian.layout import EgyptianLayout
 from xsr.egyptian.model import EgyptianNode, ParsedEgyptianRun
 from xsr.egyptian.semantics import rotation, validate_mirror, layout_options
@@ -15,7 +15,7 @@ from test_advanced_layout import text, contained, INSERTIONS
 def test_every_registered_rotation(pair,angle):
     base,vs=pair
     assert rotation(base,vs-0xFE00+1)==angle
-    node=HieropyAdapter().parse(text(base,vs)).structure.children[0]
+    node=EgyptianParser().parse(text(base,vs)).structure.children[0]
     assert node.rotation==angle
 
 
@@ -36,7 +36,7 @@ def test_no_rotate_except_registered_variants(base):
 @pytest.mark.parametrize('base,vs',[(0x13000,0xFE00),(0x13153,0xFE03),(0x13399,0xFE02),(0x13419,0xFE04)])
 def test_unregistered_rotation_is_not_guessed(base,vs):
     with pytest.raises(ValueError,match='XSR-VARIANT-UNREGISTERED'):
-        HieropyAdapter().parse(text(base,vs))
+        EgyptianParser().parse(text(base,vs))
 
 
 def test_same_selector_different_registered_angles():
@@ -51,9 +51,9 @@ def test_geometry_primitive_retains_all_angles(font,angle):
 
 @pytest.mark.parametrize('slot,cps',INSERTIONS)
 def test_rtl_insertion_uses_logical_start_end(font,slot,cps):
-    adapter=HieropyAdapter()
-    ltr=adapter.layout(text(*cps),font)
-    rtl=adapter.layout(text(*cps),font,direction='rtl')
+    parser=EgyptianParser()
+    ltr=parser.layout(text(*cps),font)
+    rtl=parser.layout(text(*cps),font,direction='rtl')
     contained(rtl)
     a,b=ltr.insertions[-1],rtl.insertions[-1]
     assert a.slot==b.slot==slot
@@ -63,8 +63,8 @@ def test_rtl_insertion_uses_logical_start_end(font,slot,cps):
 
 def test_rtl_top_level_and_nested_order(font):
     s=text(0x13000,0x13431,0x13050,0x13430,0x13153,0x133CF)
-    ltr=HieropyAdapter().layout(s,font)
-    rtl=HieropyAdapter().layout(s,font,direction='rtl')
+    ltr=EgyptianParser().layout(s,font)
+    rtl=EgyptianParser().layout(s,font,direction='rtl')
     assert rtl.glyphs[0].codepoint==0x133CF
     bycp={g.codepoint:g for g in rtl.glyphs}
     for g in ltr.glyphs:
@@ -75,9 +75,9 @@ def test_rtl_top_level_and_nested_order(font):
 
 def test_rtl_rotation_is_reflection_after_logical_rotation(font):
     s=text(0x13012,0xFE03)
-    a=HieropyAdapter().layout(s,font).glyphs[0]
-    b=HieropyAdapter().layout(s,font,direction='rtl').glyphs[0]
-    c=HieropyAdapter().layout(s+chr(0x13440),font,direction='rtl').glyphs[0]
+    a=EgyptianParser().layout(s,font).glyphs[0]
+    b=EgyptianParser().layout(s,font,direction='rtl').glyphs[0]
+    c=EgyptianParser().layout(s+chr(0x13440),font,direction='rtl').glyphs[0]
     assert a.rotation==b.rotation==c.rotation==30
     assert not a.mirror and b.mirror and not c.mirror
     assert b.ink_left==pytest.approx(-a.ink_left-a.width/a.scale)
@@ -91,9 +91,9 @@ def test_enclosure_endpoints(font,direction,pair):
     seq=([a,0x13447] if a else [])+[0x1343E if walled else 0x1343C,0x13000,0x1343F if walled else 0x1343D]+([b,0x13455] if b else [])
     if a==0x1342F and a not in font._cmap:
         with pytest.raises(ValueError,match='XSR-GLYPH-MISSING'):
-            HieropyAdapter().layout(text(*seq),font,direction=direction)
+            EgyptianParser().layout(text(*seq),font,direction=direction)
         return
-    r=HieropyAdapter().layout(text(*seq),font,direction=direction)
+    r=EgyptianParser().layout(text(*seq),font,direction=direction)
     contained(r)
     if a or b:
         assert any(d.kind=='shade' for d in r.decorations)
@@ -106,13 +106,13 @@ def test_enclosure_endpoints(font,direction,pair):
 @pytest.mark.parametrize('joiner',[None,0x13431,0x13430])
 def test_continuous_shading_has_no_gap(font,a,b,joiner):
     cps=[a,0xFE00]+([joiner] if joiner else [])+[b,0xFE00]
-    r=HieropyAdapter().layout(text(*cps),font)
+    r=EgyptianParser().layout(text(*cps),font)
     x,y=r.decorations
     if joiner==0x13430:
         assert x.y+x.height==pytest.approx(y.y)
     else:
         assert x.x+x.width==pytest.approx(y.x)
-    ordinary=HieropyAdapter().layout(text(a,*([joiner] if joiner else []),b),font)
+    ordinary=EgyptianParser().layout(text(a,*([joiner] if joiner else []),b),font)
     x,y=ordinary.decorations
     assert (y.y-x.y-x.height if joiner==0x13430 else y.x-x.x-x.width)>0
 
@@ -120,7 +120,7 @@ def test_continuous_shading_has_no_gap(font,a,b,joiner):
 @pytest.mark.parametrize('brackets',['[]','{}','\u2e22\u2e23','\u27e8\u27e9','\u27e6\u27e7'])
 def test_brackets_in_quadrats(font,brackets):
     s=brackets[0]+text(0x13000,0x13431,0x13050)+brackets[1]
-    r=HieropyAdapter().layout(s,font)
+    r=EgyptianParser().layout(s,font)
     contained(r)
     assert len(r.glyphs)==2
     assert len(r.decorations)==2
@@ -143,25 +143,25 @@ def test_writing_mode_is_reserved():
 
 @pytest.mark.parametrize('direction',['ltr','rtl'])
 def test_empty_enclosure_and_redundant_segment(font,direction):
-    a=HieropyAdapter()
+    a=EgyptianParser()
     contained(a.layout(text(0x13379,0x1343C,0x1343D,0x1337A),font,direction=direction))
     assert a.layout(text(0x13437,0x13000,0x13438),font,direction=direction)==a.layout(text(0x13000),font,direction=direction)
 
 
 def test_unicode_complex_editorial_brackets(font):
     s='['+text(0x1308B,0x13430,0x133CF,0x13431)+'['+text(0x133E5)
-    r=HieropyAdapter().layout(s,font)
+    r=EgyptianParser().layout(s,font)
     contained(r)
     assert len(r.decorations)==2 and len(r.glyphs)==3
 
 
 def test_unregistered_high_selector():
     with pytest.raises(ValueError,match='XSR-VARIANT-UNREGISTERED'):
-        HieropyAdapter().parse(text(0x13000,0xFE07))
+        EgyptianParser().parse(text(0x13000,0xFE07))
 
 
 def test_mixed_lost_spacing_and_phase(font):
-    a=HieropyAdapter()
+    a=EgyptianParser()
     regular=a.layout(text(0x13443,0x13443),font)
     mixed=a.layout(text(0x13443,0xFE00,0x13443),font)
     continuous=a.layout(text(0x13443,0xFE00,0x13443,0xFE00),font)
@@ -172,7 +172,7 @@ def test_mixed_lost_spacing_and_phase(font):
 
 @pytest.mark.parametrize('brackets',['[[', '[{', '\u27e8['])
 def test_consecutive_editorial_brackets_are_preserved(font,brackets):
-    r=HieropyAdapter().layout(brackets+text(0x13000)+']]',font)
+    r=EgyptianParser().layout(brackets+text(0x13000)+']]',font)
     contained(r)
     assert len(r.decorations)==4
     assert [d.kind for d in r.decorations[:2]]==['bracket-'+str(ord(c)) for c in brackets]

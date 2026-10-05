@@ -24,17 +24,31 @@ jobs:
           sudo apt-get install -y --no-install-recommends texlive-xetex texlive-latex-recommended texlive-pictures lmodern poppler-utils
       - name: Install package and test tools
         run: python -m pip install '.[test]'
-      - name: Download checksum-verified official Noto reference font
-        run: python scripts/fetch_noto.py
+      - name: Verify normal installation has no Hieropy
+        run: |
+          python - <<'PY'
+          import importlib.util
+          from importlib import metadata
+          from xsr.egyptian import EgyptianParser
+          assert importlib.util.find_spec('hieropy') is None
+          assert all('hieropy' not in requirement.lower() for requirement in
+                     (metadata.requires('xetex-stack-renderer') or ()))
+          assert EgyptianParser().parse(chr(0x13000)).structure.children[0].codepoint == 0x13000
+          PY
+      - name: Download checksum-verified official reference fonts
+        run: |
+          python scripts/fetch_noto.py
+          python scripts/fetch_newgardiner.py
       - name: Verify generated Unicode semantics
         run: python scripts/generate_unicode_data.py --check
       - name: Verify Python, geometry, fonts and XeLaTeX
         run: python -m pytest -ra --junitxml=tmp/test-results.xml
+      - name: Verify XeLaTeX integration separately
+        run: python -m pytest tests/test_tex_integration.py -q
       - name: Rebuild visual showcase without shell escape
         shell: bash
         run: |
-          NEWGARDINER=$(python -c "import hieropy,pathlib; print(pathlib.Path(hieropy.__file__).parent/'resources/NewGardiner.ttf')")
-          python scripts/build_showcase.py --font tmp/fonts/NotoSansEgyptianHieroglyphs-Regular.ttf --font "$NEWGARDINER" --output tmp/ci-showcase.pdf
+          python scripts/build_showcase.py --font tmp/fonts/NotoSansEgyptianHieroglyphs-Regular.ttf --font tmp/fonts/NewGardiner.ttf --output tmp/ci-showcase.pdf
           python scripts/check_showcase.py tmp/ci-showcase.pdf
           pdftoppm -scale-to 1400 -png tmp/ci-showcase.pdf tmp/ci-showcase
       - name: Upload test report and visual artifacts

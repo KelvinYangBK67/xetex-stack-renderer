@@ -1,7 +1,7 @@
 """Font outline transforms and conservative scanline occupancy.
 
 Raster masks are used ONLY for layout decisions. Output remains vector glyphs.
-No font names, sign-specific slots, alternate glyphs or Hieropy metrics enter
+No font names, sign-specific slots, alternate glyphs or reference-font metrics enter
 this module. Cubic/quadratic curves are flattened adaptively in normalized em.
 """
 import math

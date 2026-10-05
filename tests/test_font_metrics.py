@@ -3,7 +3,7 @@ import pytest
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from xsr.font_metrics import FontMetrics, load_font
-from xsr.egyptian import HieropyAdapter
+from xsr.egyptian import EgyptianParser
 from xsr.renderer import default_renderer
 from conftest import FONTS
 
@@ -44,7 +44,7 @@ def test_units_and_true_ink_bounds(tmp_path):
         assert g.height == pytest.approx(.9)
         assert font.ascender == 1 and font.descender == -.25
         assert font.outline(0x13000)[0] == ('moveTo', ((-.1, -.2),))
-        metrics.append(HieropyAdapter().layout(chr(0x13000), font))
+        metrics.append(EgyptianParser().layout(chr(0x13000), font))
     assert metrics[0] == metrics[1]
 
 
@@ -74,7 +74,7 @@ def test_font_loading_and_outlines(font):
 def test_reference_fonts_change_geometry():
     if len(FONTS) < 2:
         pytest.skip('install a second reference font or set XSR_TEST_FONTS')
-    layouts = [HieropyAdapter().layout(chr(0x13000) + chr(0x13431) + chr(0x13153), load_font(p)) for p in FONTS]
+    layouts = [EgyptianParser().layout(chr(0x13000) + chr(0x13431) + chr(0x13153), load_font(p)) for p in FONTS]
     assert len(set(layouts)) > 1
 
 

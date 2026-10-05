@@ -1,6 +1,6 @@
 import math
 import pytest
-from xsr.egyptian import EgyptianLayoutError, GlyphPlacement, HieropyAdapter, RenderResult, serialize_tex_layout
+from xsr.egyptian import EgyptianLayoutError, GlyphPlacement, EgyptianParser, RenderResult, serialize_tex_layout
 
 A, B, C = map(chr, (0x13000, 0x13050, 0x13153))
 H, V, BEGIN, END = map(chr, (0x13431, 0x13430, 0x13437, 0x13438))
@@ -21,7 +21,7 @@ def assert_contained(result):
 
 
 def test_single_sign_geometry(font):
-    result = HieropyAdapter().layout(A, font)
+    result = EgyptianParser().layout(A, font)
     metric = font.glyph(ord(A))
     g, = result.glyphs
     assert g.width == pytest.approx(metric.width * g.scale)
@@ -35,7 +35,7 @@ def test_single_sign_geometry(font):
 
 
 def test_horizontal_joiner_geometry(font):
-    result = HieropyAdapter().layout(A + H + B, font)
+    result = EgyptianParser().layout(A + H + B, font)
     first, second = result.glyphs
     assert [g.codepoint for g in result.glyphs] == [ord(A), ord(B)]
     assert first.x + first.width < second.x
@@ -45,7 +45,7 @@ def test_horizontal_joiner_geometry(font):
 
 
 def test_vertical_joiner_geometry(font):
-    result = HieropyAdapter().layout(A + V + B, font)
+    result = EgyptianParser().layout(A + V + B, font)
     first, second = result.glyphs
     assert [g.codepoint for g in result.glyphs] == [ord(A), ord(B)]
     assert first.y + first.height < second.y
@@ -57,13 +57,13 @@ def test_vertical_joiner_geometry(font):
 
 
 def test_nested_horizontal_and_vertical_geometry(font):
-    vertical_outer = HieropyAdapter().layout(A + H + B + V + C, font)
+    vertical_outer = EgyptianParser().layout(A + H + B + V + C, font)
     h_first, h_second, bottom = vertical_outer.glyphs
     assert h_first.y + h_first.height / 2 == pytest.approx(h_second.y + h_second.height / 2)
     assert h_first.x + h_first.width < h_second.x
     assert max(g.y + g.height for g in (h_first, h_second)) < bottom.y
     assert_contained(vertical_outer)
-    horizontal_outer = HieropyAdapter().layout(A + H + BEGIN + B + V + C + END, font)
+    horizontal_outer = EgyptianParser().layout(A + H + BEGIN + B + V + C + END, font)
     left, v_first, v_second = horizontal_outer.glyphs
     assert left.x + left.width < min(v_first.x, v_second.x)
     assert v_first.y + v_first.height < v_second.y
@@ -78,25 +78,21 @@ def test_geometry_serializes_to_xetex_layout_commands():
 
 
 def test_overlay_centers_actual_ink(font):
-    result = HieropyAdapter().layout(A + chr(0x13436) + B, font)
+    result = EgyptianParser().layout(A + chr(0x13436) + B, font)
     first, second = result.glyphs
     assert first.x + first.width/2 == pytest.approx(second.x + second.width/2)
     assert first.y + first.height/2 == pytest.approx(second.y + second.height/2)
 
 def test_delimiter_damage_is_rendered(font):
-    result=HieropyAdapter().layout(chr(0x13379)+chr(0x13447)+chr(0x1343C)+A+chr(0x1343D)+chr(0x1337A),font)
+    result=EgyptianParser().layout(chr(0x13379)+chr(0x13447)+chr(0x1343C)+A+chr(0x1343D)+chr(0x1337A),font)
     assert result.decorations[0].kind=='cartouche'
     assert any(d.kind=='shade' for d in result.decorations)
 
 
-def test_hieropy_geometry_is_never_used(monkeypatch, font):
-    from hieropy.unistructure import Fragment, Horizontal, Literal, Vertical
-    def forbidden(*args, **kwargs):
-        pytest.fail('Hieropy geometry was used')
-    for cls in (Fragment, Horizontal, Literal, Vertical):
-        monkeypatch.setattr(cls, 'size', forbidden)
-        monkeypatch.setattr(cls, 'format', forbidden)
-    assert_contained(HieropyAdapter().layout(A + H + B + V + C, font))
+def test_native_parser_does_not_import_hieropy(monkeypatch, font):
+    import sys
+    monkeypatch.setitem(sys.modules, 'hieropy', None)
+    assert_contained(EgyptianParser().layout(A + H + B + V + C, font))
 
 
 def test_showcase_sequences_have_contained_disjoint_ink(font):
@@ -106,4 +102,4 @@ def test_showcase_sequences_have_contained_disjoint_ink(font):
     sequences = {run.text for run in build_default_registry().script_runs(source)}
     assert len(sequences) >= 12
     for text in sequences:
-        assert_contained(HieropyAdapter().layout(text, font))
+        assert_contained(EgyptianParser().layout(text, font))

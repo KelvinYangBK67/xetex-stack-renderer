@@ -20,8 +20,8 @@ from .backend import (  # noqa: E402
     EgyptianBackend,
     serialize_tex_layout,
 )
-from .hieropy_adapter import EgyptianParseError, HieropyAdapter  # noqa: E402
-from .layout import EgyptianLayout, EgyptianLayoutError, HieropyLayout  # noqa: E402
+from .parser import EgyptianParseError, EgyptianParser  # noqa: E402
+from .layout import EgyptianLayout, EgyptianLayoutError  # noqa: E402
 from .model import EgyptianNode, GlyphPlacement, ParsedEgyptianRun, RenderResult  # noqa: E402
 
 __all__ = [
@@ -33,8 +33,7 @@ __all__ = [
     'EgyptianNode',
     'EgyptianParseError',
     'GlyphPlacement',
-    'HieropyAdapter',
-    'HieropyLayout',
+    'EgyptianParser',
     'ParsedEgyptianRun',
     'RenderResult',
     'register_script',

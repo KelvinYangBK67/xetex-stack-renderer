@@ -48,7 +48,7 @@ def test_backend_parses_and_renders_one_complete_run(tmp_path: Path, font_option
     tex = renderer.render('egyptian', run, font_options)
 
     assert tex.startswith(r'\xsrBackendLayoutResult{egyptian}{3}')
-    assert f'{{{BACKEND_VERSION}}}{{hieropy-0.1.4}}' in tex
+    assert f'{{{BACKEND_VERSION}}}{{xsr-native-0.7}}' in tex
     assert r'\xsrEgyptianLayout' in tex
     assert tex.count(r'\xsrEgyptianGlyph') == 2
     assert len(list((tmp_path / 'cache').glob('*.tex'))) == 1

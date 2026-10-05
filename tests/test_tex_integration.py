@@ -5,7 +5,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-import hieropy
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,8 +19,8 @@ def valid_ehfc() -> str:
     return A + H + B
 
 
-def hieropy_test_font_preamble() -> str:
-    font = Path(hieropy.__file__).parent / 'resources' / 'NewGardiner.ttf'
+def reference_font_preamble() -> str:
+    font = Path(os.environ.get('XSR_NEWGARDINER_FONT', ROOT / 'tmp/fonts/NewGardiner.ttf'))
     return fr'\xsrEgyptianFont{{{font.as_posix()}}}'
 
 
@@ -36,7 +35,7 @@ def run_xelatex(
     packages: str = r'\usepackage{xetex-stack-renderer}',
 ) -> subprocess.CompletedProcess[str]:
     if not preamble:
-        preamble = hieropy_test_font_preamble()
+        preamble = reference_font_preamble()
     source = tmp_path / 'integration.tex'
     source.write_text(
         '\\documentclass{article}\n'
@@ -87,13 +86,13 @@ def assert_real_layout(
 def test_latin_ehfc_latin_dispatches_one_complete_run(tmp_path: Path) -> None:
     body = f'Latin {with_egyptian_font(valid_ehfc())} Latin'
     completed = run_xelatex(
-        tmp_path, body, preamble=hieropy_test_font_preamble()
+        tmp_path, body, preamble=reference_font_preamble()
     )
 
     assert_real_layout(completed, glyphs=2)
     assert completed.stdout.count('XSR-DISPATCH script=egyptian codepoints=3') == 1
     assert completed.stdout.count('XSR-BACKEND script=egyptian codepoints=3') == 1
-    assert 'parser=hieropy-0.1.4' in completed.stdout
+    assert 'parser=xsr-native-0.7' in completed.stdout
     assert (tmp_path / 'integration.pdf').is_file()
 
 
@@ -102,7 +101,7 @@ def test_single_sign_real_layout(tmp_path: Path) -> None:
     completed = run_xelatex(
         tmp_path,
         with_egyptian_font(A),
-        preamble=hieropy_test_font_preamble(),
+        preamble=reference_font_preamble(),
     )
 
     assert_real_layout(completed, glyphs=1)
@@ -115,7 +114,7 @@ def test_horizontal_group_real_layout(tmp_path: Path) -> None:
     completed = run_xelatex(
         tmp_path,
         with_egyptian_font(A + H + B),
-        preamble=hieropy_test_font_preamble(),
+        preamble=reference_font_preamble(),
     )
 
     assert_real_layout(completed, glyphs=2)
@@ -128,7 +127,7 @@ def test_vertical_group_real_layout(tmp_path: Path) -> None:
     completed = run_xelatex(
         tmp_path,
         with_egyptian_font(A + V + B),
-        preamble=hieropy_test_font_preamble(),
+        preamble=reference_font_preamble(),
     )
 
     assert_real_layout(completed, glyphs=2)
@@ -141,7 +140,7 @@ def test_nested_hv_group_real_layout(tmp_path: Path) -> None:
     completed = run_xelatex(
         tmp_path,
         with_egyptian_font(A + H + B + V + C),
-        preamble=hieropy_test_font_preamble(),
+        preamble=reference_font_preamble(),
     )
 
     assert_real_layout(completed, glyphs=3)
@@ -301,9 +300,9 @@ def test_advanced_ehfc_integration(tmp_path,font):
 @pytest.mark.skipif(shutil.which('xelatex') is None, reason='xelatex is unavailable')
 def test_unicode_font_directory_and_filename(tmp_path):
     from conftest import NEW_GARDINER
-    directory=tmp_path/'字型 Sammlung'
+    directory=tmp_path/'瀛楀瀷 Sammlung'
     directory.mkdir()
-    font=directory/'象形文字 font.ttf'
+    font=directory/'璞″舰鏂囧瓧 font.ttf'
     shutil.copy2(NEW_GARDINER,font)
     result=run_xelatex(tmp_path,A+H+B,fr'\xsrEgyptianDefaultFont{{{font.as_posix()}}}')
     assert_real_layout(result,2)
@@ -455,12 +454,12 @@ def test_06_features_and_rtl_preprocess(tmp_path):
 def test_quadrat_breaks_add_no_spacing(tmp_path,direction):
     from conftest import NEW_GARDINER
     from xsr.font_metrics import load_font
-    from xsr.egyptian import HieropyAdapter
+    from xsr.egyptian import EgyptianParser
     body=fr'\xsrEgyptianDirection{{{direction}}}\setbox0=\hbox{{'+A+B+C+r'}\typeout{XSR-WIDTH=\the\wd0}\box0'
     result=run_xelatex(tmp_path,body)
     assert result.returncode==0,result.stdout
     measured=float(re.search(r'XSR-WIDTH=([0-9.]+)pt',result.stdout).group(1))
-    expected=10*HieropyAdapter().layout(A+B+C,load_font(NEW_GARDINER),direction=direction).width
+    expected=10*EgyptianParser().layout(A+B+C,load_font(NEW_GARDINER),direction=direction).width
     assert measured==pytest.approx(expected,abs=.002)
 
 

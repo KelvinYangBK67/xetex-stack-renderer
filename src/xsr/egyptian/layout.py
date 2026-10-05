@@ -18,7 +18,7 @@ class EgyptianLayout:
     Each top-level group fits within one em of height without enlargement.
     H/V gaps are 0.08 em before fitting; outer padding is 0.04 em. Plain
     successive signs form independent quadrats. No reference-font geometry
-    or Hieropy layout methods enter this layer.
+    or external parser layout methods enter this layer.
     """
     gap = 0.08
     padding = 0.04
@@ -189,7 +189,3 @@ class EgyptianLayout:
                             tuple(g for b in placed for g in b.glyphs),
                             tuple(d for b in placed for d in b.decorations),
                             tuple(r for b in placed for r in b.insertions))
-
-
-# Compatibility name; this class no longer consumes Hieropy geometry.
-HieropyLayout = EgyptianLayout

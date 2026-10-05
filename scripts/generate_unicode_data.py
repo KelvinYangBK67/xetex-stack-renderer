@@ -1,14 +1,14 @@
-"""Generate Egyptian semantics from checksum-pinned Unicode 17.0.0 data."""
+"""Generate Egyptian semantics from checksum-pinned Unicode 18.0.0 data."""
 import argparse
 import hashlib
 from pathlib import Path
 import re
 from urllib.request import urlopen
 
-VERSION = '17.0.0'
+VERSION = '18.0.0'
 SOURCES = {
-    'StandardizedVariants.txt': 'f55100b2fb11d3d75a37b8c1ab752192dbd1c4b12328c5ec6b38e3807c0ca597',
-    'Unikemet.txt': 'a7b46c19e24355257030b73be046c71b172595ec4a106867d3f988e3a4007208',
+    'StandardizedVariants.txt': 'c7ae634a7e2bb0932258548a1e81df984fbb38e30cecf4269391d6a4f94581ac',
+    'Unikemet.txt': 'a6c03de18f40f54df5bf3ea6c3152f23075ba8647520e98ea80e8e0352d65a33',
 }
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'src/xsr/egyptian/unicode_data.py'

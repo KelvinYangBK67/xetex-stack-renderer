@@ -7,13 +7,13 @@ from typing import Mapping
 
 from ..font_metrics import options_font, font_options, encode_path, tex_font_path
 from ..ink import matrix
-from .hieropy_adapter import HieropyAdapter
+from .parser import EgyptianParser
 from .model import RenderResult
 from .layout import EgyptianLayout
 from .semantics import layout_options
 
 
-BACKEND_VERSION = 'font-aware-ehfc-0.6'
+BACKEND_VERSION = 'font-aware-ehfc-0.7'
 
 
 def _tex_number(value: float) -> str:
@@ -51,8 +51,8 @@ class EgyptianBackend:
     name = 'egyptian'
     version = BACKEND_VERSION
 
-    def __init__(self, adapter: HieropyAdapter | None = None) -> None:
-        self.adapter = adapter or HieropyAdapter()
+    def __init__(self, parser: EgyptianParser | None = None) -> None:
+        self.parser = parser or EgyptianParser()
 
     def prepare_options(self, options: Mapping[str, object]) -> dict[str, object]:
         font = options_font(options)
@@ -66,11 +66,11 @@ class EgyptianBackend:
         font = options_font(options)
         tex_font_path(font.path)
         direction=layout_options(options)
-        quadrats=EgyptianLayout(font,direction).quadrats(self.adapter.parse(text))
+        quadrats=EgyptianLayout(font,direction).quadrats(self.parser.parse(text))
         layout_tex=r'\xsrEgyptianBreak{}'.join(serialize_tex_layout(q) for q in quadrats)
         layout_tex=r'\xsrEgyptianFlow{'+direction+'}{'+layout_tex+'}'
         digest = hashlib.sha256(text.encode('utf-8')).hexdigest()[:12]
-        parser = f'hieropy-{self.adapter.parser_version}'
+        parser = f'xsr-native-{self.parser.parser_version}'
         body = (r'\xsrEgyptianUseFont'
                 f'{{{encode_path(tex_font_path(font.path))}}}{{{font.digest}}}'
                 f'{{{layout_tex}}}')

@@ -4,13 +4,13 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'xetex-stack-renderer'
-version = '0.6'
+version = '0.7'
 description = 'External renderer framework for Unicode-driven stacked scripts in XeTeX'
 readme = 'README.md'
 requires-python = '>=3.11'
 license = { text = 'MIT' }
 authors = [{ name = 'xetex-stack-renderer contributors' }]
-dependencies = ['hieropy>=0.1.4,<0.1.5', 'fonttools>=4.50,<5', 'pillow>=10']
+dependencies = ['fonttools>=4.50,<5', 'pillow>=10']
 
 [project.optional-dependencies]
 test = ['pytest>=8', 'pymupdf>=1.24']

@@ -1,6 +1,6 @@
 # xetex-stack-renderer
 
-XSR **0.6** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
+XSR **0.7** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
 frontend dispatches complete script runs to registered backends. Egyptian
 Hieroglyphs is the first backend.
 
@@ -40,21 +40,21 @@ Unicode codepoint lists rather than interpolated JSON strings.
 
 ## EHFC support
 
-The accepted syntax follows Hieropy 0.1.4 and Unicode Egyptian format controls.
+The accepted syntax follows Unicode 18 Egyptian format controls. XSR parses EHFC natively.
 Start/end are logical: left/right in LTR, right/left in RTL.
 
-| Feature | Controls / support in 0.6 |
+| Feature | Controls / support in 0.7 |
 | --- | --- |
 | Plain signs | Unicode glyphs present in the selected font |
 | Vertical / horizontal | U+13430 / U+13431; nested groups |
-| Segments | U+13437 / U+13438, where accepted by the parser |
+| Segments | U+13437 / U+13438, with recursive grouping |
 | Corner insertion | U+13432–U+13435: top-start, bottom-start, top-end, bottom-end |
 | Middle / top / bottom insertion | U+13439 / U+1343A / U+1343B |
 | Overlay | U+13436; ink-centered horizontal and vertical arms |
 | Plain enclosure | U+1343C / U+1343D; cartouche and rectangular forms |
 | Walled enclosure | U+1343E / U+1343F |
 | Mirror | U+13440, applied after rotation |
-| Rotation | Registered sign + VS pairs from Unicode 17 StandardizedVariants; no universal VS-to-angle mapping |
+| Rotation | Registered sign + VS pairs from Unicode 18 StandardizedVariants; no universal VS-to-angle mapping |
 | Blanks | U+13441 / U+13442: full / half |
 | Lost signs | U+13443–U+13446: full, half, tall, wide; FE00 expands shading continuously |
 | Damage | U+13447–U+13455: all 15 quadrant combinations, including enclosure ends |
@@ -107,7 +107,7 @@ This host-dispatch API avoids globally activating ASCII
 punctuation or changing TeX grouping. Outside this command, ordinary brackets and
 braces retain their usual TeX meaning. Vector brackets do not require punctuation
 glyphs in the Egyptian font. Consecutive nested editorial brackets are preserved;
-redundant singleton segments are normalized before structural parsing.
+redundant singleton segments produce equivalent native structures.
 
 ### Unicode semantics
 
@@ -121,12 +121,12 @@ Unikemet `kEH_NoMirror=Y` prohibits an explicit U+13440 when it would change sig
 identity (`XSR-NO-MIRROR`); ordinary RTL orientation remains independent.
 `kEH_NoRotate=Y` rejects unregistered rotations with `XSR-NO-ROTATE`. A specific
 registered variation sequence takes precedence over that broad property: Unicode
-17 lists both for M003 and V006. No speculative warnings are based on provisional
+18 lists both for M003 and V006. No speculative warnings are based on provisional
 catalog classifications, and legacy codepoints are not rewritten automatically.
 
-The tables are generated from checksum-pinned Unicode **17.0.0** data, the stable
-release selected for this implementation, rather than the proposed Unicode 18
-update. To reproduce/verify them:
+The tables are generated from checksum-pinned Unicode **18.0.0** data. Their
+rotation, NoMirror and NoRotate entries are unchanged from 17.0.0; only the
+recorded Unicode version changed. To reproduce/verify them:
 
 ```powershell
 python scripts/generate_unicode_data.py
@@ -135,21 +135,30 @@ python scripts/generate_unicode_data.py --check
 
 The script downloads source data into ignored `tmp/unicode` if needed; the compact
 generated module and Unicode license are committed and included in the package.
-CI checks regeneration deterministically. Source specifications:
-[StandardizedVariants.txt](https://www.unicode.org/Public/17.0.0/ucd/StandardizedVariants.txt),
-[Unikemet.txt](https://www.unicode.org/Public/17.0.0/ucd/Unikemet.txt),
-[UAX #57 revision 5](https://www.unicode.org/reports/tr57/tr57-5.html),
-and [Unicode 17 chapter 11](https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-11/).
+CI checks regeneration deterministically. Sources:
+[StandardizedVariants.txt](https://www.unicode.org/Public/18.0.0/ucd/StandardizedVariants.txt),
+[Unikemet.txt](https://www.unicode.org/Public/18.0.0/ucd/Unikemet.txt),
+[UAX #57 revision 6](https://www.unicode.org/reports/tr57/tr57-6.html),
+and [Unicode 18 chapter 11](https://www.unicode.org/versions/Unicode18.0.0/core-spec/chapter-11/).
 
 ## Font-aware architecture
 
 ```
-EHFC -> Hieropy syntax -> immutable XSR structure
+EHFC -> native XSR parser -> immutable XSR structure
      -> selected font's outlines -> XSR layout -> same-file XeTeX glyphs + PGF
 ```
 
-Hieropy supplies parsing and structure only. Its `format`, `fit`, `size`, alternate
-glyph recipes and NewGardiner measurements are not layout inputs. `FontMetrics`
+The parser is an independent recursive-descent implementation of Unicode
+chapter 11.4.2, producing the existing `ParsedEgyptianRun` and `EgyptianNode`
+model. Insertion binds before overlay, horizontal join, then vertical join.
+Segments group recursively; H/V joins collect operands in source order, while
+adjacent complete expressions begin separate quadrats. Modifiers attach to one sign in
+variation-selector, mirror, damage order. Enclosure controls scope their
+interior and optional endpoint signs. Editorial brackets attach to adjacent
+horizontal content in explicit Egyptian context. The parser was built from
+Unicode specifications and XSR's own semantic model, not from Hieropy source.
+No external parser or reference-font measurements enter layout.
+`FontMetrics`
 uses fontTools for normalized metrics, decomposed outlines and exact Bezier bounds.
 No font-name branches or per-font insertion coordinates are used.
 
@@ -179,7 +188,7 @@ optical perfection.
   contextual suffix registration keeps rotation selectors in Egyptian runs.
 
 Hosts may omit the detector, load `xsr-core` and `xsr-egyptian`, and call
-`\xsr_dispatch_run:nn{egyptian}{...}` with a complete run. The generic core and detector are unchanged in 0.6 apart from version metadata.
+`\xsr_dispatch_run:nn{egyptian}{...}` with a complete run. The generic core and detector are unchanged in 0.7 apart from version metadata.
 Direction, semantic validation and editorial context remain in the Egyptian backend.
 
 Font contents are fingerprinted in request/cache identities and checked when TeX
@@ -241,14 +250,15 @@ so an unsuccessful invocation cannot silently reuse an earlier successful respon
 ```powershell
 python -m pip install '.[test]'
 python scripts/fetch_noto.py
+python scripts/fetch_newgardiner.py
 python -m pytest
 python -m pytest tests/test_tex_integration.py
-python scripts/build_showcase.py --font tmp/fonts/NotoSansEgyptianHieroglyphs-Regular.ttf --font C:/Fonts/NewGardiner.ttf --font C:/Windows/Fonts/seguihis.ttf
+python scripts/build_showcase.py --font tmp/fonts/NotoSansEgyptianHieroglyphs-Regular.ttf --font tmp/fonts/NewGardiner.ttf --font C:/Windows/Fonts/seguihis.ttf
 python scripts/check_showcase.py examples/egyptian-showcase.pdf
 ```
 
 The builder accepts two or three fonts and compiles in a fresh temporary directory
-without shell escape. The committed [six-page 0.6 showcase](examples/egyptian-showcase.pdf)
+without shell escape. The committed [six-page 0.7 showcase](examples/egyptian-showcase.pdf)
 and [editable source](examples/egyptian-showcase.tex) compare Noto, NewGardiner and
 Segoe UI Historic across basic layout, all seven insertion slots, overlay,
 enclosures, registered transforms, RTL, editorial brackets, continuous shading,
@@ -256,14 +266,15 @@ paragraph wrapping and combinations. The older
 [font-metrics showcase](examples/font-metrics-showcase.pdf) is the historical 0.4 baseline.
 
 [GitHub Actions](.github/workflows/ci.yml) installs the package on Ubuntu 24.04 with
-Python 3.11, focused TeX Live packages and Poppler; downloads checksum-verified Noto
-from the official Noto repository at runtime; runs all tests; and rebuilds a
-two-font showcase. Test reports, PDF and page images are artifacts, never automatic
-commits. NewGardiner comes from Hieropy; Segoe is optional on Windows. No external
-fonts are vendored. Noto can also be selected with `XSR_NOTO_FONT`; additional test
+Python 3.11, focused TeX Live packages and Poppler; downloads checksum-verified Noto and NewGardiner
+from their official repositories at runtime; verifies Hieropy is absent, runs
+all tests plus separate XeLaTeX integration, and rebuilds a two-font showcase. Test reports, PDF and page images are artifacts, never automatic
+commits. NewGardiner is fetched from its pinned official upstream revision; Segoe is
+optional on Windows. No external fonts are vendored. Noto can also be selected with `XSR_NOTO_FONT`; additional test
 fonts use `XSR_TEST_FONTS` (an `os.pathsep`-separated list).
 
-See [0.6 verification and unsupported-case audit](docs/v0.6-verification.md).
+See [0.7 verification](docs/v0.7-verification.md). The
+[0.6 verification and unsupported-case audit](docs/v0.6-verification.md) is historical.
 The [0.5 verification](docs/v0.5-verification.md) and
 [0.4 verification](docs/v0.4-verification.md) are historical records.
 
@@ -275,9 +286,8 @@ The [0.5 verification](docs/v0.5-verification.md) and
 - Full vertical text flow, advanced baseline alignment and HieroTeX compatibility
   remain deferred. Deep nesting can make signs small; individual large quadrats
   cannot be split across lines.
-- Hieropy's grammar determines accepted structure. Malformed joiners, unknown
-  controls and invalid enclosure combinations produce explicit errors.
-  Its dependency packages remain installed even though its layout is not used.
+- Native Unicode-based parsing rejects malformed joiners, unknown controls and
+  invalid enclosure combinations with typed errors.
 - NewGardiner lacks U+0020 and can cause a harmless loading warning; Latin labels
   use the document font and XSR emits only selected Egyptian glyphs.
 - The standalone detector changes registered character catcodes. Hosts with different
@@ -291,3 +301,14 @@ The [0.5 verification](docs/v0.5-verification.md) and
 - A cmap entry can still point to a font-supplied placeholder drawing. XSR cannot
   generally distinguish such a drawing from an intentional geometric sign; visual
   review and a suitable font remain necessary.
+
+## Dependencies and licenses
+
+XSR source is [MIT licensed](LICENSE). Its direct runtime dependencies are
+[fontTools](https://github.com/fonttools/fonttools) (MIT) for outline geometry
+and [Pillow](https://github.com/python-pillow/Pillow) (MIT-CMU) for ink masks.
+Hieropy is not a runtime or test dependency. Generated Unicode semantics retain
+the [Unicode data license](src/xsr/egyptian/unicode-LICENSE.txt) in the wheel.
+Noto Sans Egyptian Hieroglyphs (SIL OFL 1.1) and NewGardiner (SIL OFL 1.1)
+are external test inputs downloaded with pinned SHA-256 checksums; no font is
+bundled with XSR. Segoe UI Historic is an optional local Windows test font.
