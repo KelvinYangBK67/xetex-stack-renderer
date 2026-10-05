@@ -1,12 +1,12 @@
 # xetex-stack-renderer
 
-XSR **0.7** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
+XSR **0.8** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
 frontend dispatches complete script runs to registered backends. Egyptian
-Hieroglyphs is the first backend.
+Hieroglyphs and Khitan Small Script have independent backends.
 
 ## Install and use
 
-Install Python 3.11+, XeLaTeX with PGF, and a compatible static Egyptian TTF/OTF:
+Install Python 3.11+, XeLaTeX with PGF, and a compatible static Unicode TTF/OTF:
 
 ```powershell
 python -m pip install -e .
@@ -37,6 +37,69 @@ use the verbatim command `\xsrEgyptianFontPath{C:\Fonts\My Font.ttf}`. Paths can
 contain `"`, `{`, `}`, `%`, `#`, `[` or `]`, NUL or line breaks. Font commands take
 literal paths, not macro expressions. Paths cross the TeX/Python boundary as
 Unicode codepoint lists rather than interpolated JSON strings.
+
+## Khitan Small Script (new in 0.8)
+
+Select an explicit static Unicode outline font. The same file supplies Python
+metrics and XeTeX glyphs:
+
+    \xsrKhitanDefaultFont{fonts/NotoSerifKhitanSmallScript-Regular.ttf}
+    In text: 𘬁𘬂 𘬁𘬂.
+    \xsrKhitanText{𘬁𘬂 𘬁𘬂}
+
+The standalone detector groups consecutive KSS characters into one cluster.
+U+0020 SPACE ends a cluster and inserts a visible, breakable **0.2 em** gap
+between adjacent KSS clusters. U+200B ZERO WIDTH SPACE ends a cluster with a
+zero-width break opportunity. Spaces next to Latin or other scripts remain
+ordinary TeX spaces. The explicit command is useful when source tokenization
+is controlled by another package. The gap can be scoped with
+\xsrKhitanClusterGap{0.35}; Python callers use cluster_gap=0.35.
+
+U+16FE4 KHITAN SMALL SCRIPT FILLER occurs **once, immediately after the first
+sign** of a multi-sign cluster. Without it, Type A places pairs left/right
+from the first row, with a final odd sign centered. With it, Type B centers
+the first sign, then places the remaining signs in left/right pairs, again
+centering a final odd sign. Text order is left to right, then top to bottom.
+The iteration mark U+18B00 is a sign in the stack; its repetition meaning is
+not drawn as a duplicate. U+18CFF is accepted as an unidentified/missing sign
+when the selected font provides an outline. Unassigned codepoints and malformed
+filler/separators fail with typed Khitan diagnostics. Unicode describes typical
+phonograms of two to eight signs, with single-sign units also possible;
+the implementation does not impose a smaller arbitrary length limit.
+
+Layout uses the selected font's actual advances and ink bounds to center each
+original glyph in a fixed slot. Every glyph has scale 1: no Noto positional
+alternates, discretionary ligatures, compression, rotation, or glyph-specific
+coordinate tables are required. A two-column cluster is approximately two
+font ems wide. It is an indivisible, upright box with natural height, bottom
+aligned to the horizontal text baseline. A four-row cluster is at least four
+ems high and enlarges only its containing TeX line. Full traditional vertical
+document flow is reserved; the internal cluster order and geometry can be
+reused by a future vertical host.
+
+The [five-page Khitan showcase](examples/khitan-showcase.pdf) includes a
+reference comparison with Noto's native rclt shaping and a fifth page comparing
+the same XSR layout in Noto and the user-supplied Khitan Small Linear font. Native Noto produces
+the same structural ordering in the tested corpus, with its own optical
+refinements. XSR correctness never depends on that feature. The reference
+font is the official [Noto Khitan release v1.000](https://github.com/notofonts/khitan-small-script/releases/tag/NotoSerifKhitanSmallScript-v1.000)
+(commit c659d517071caaa442218626c6b59db52c785c76). The pinned release
+archive SHA-256 is
+daf885a451fe4c9446d5cbbe6c8a2415b62d92f2636cbd1bacb29da4d7475ff5;
+the extracted hinted TTF SHA-256 is
+ad6d20d17e7b0af746106b8e0e3ac65c47f6813a4acb6e05786023e1374a953f.
+No font binary is committed. The optional Linear font file used for the
+committed comparison page has SHA-256
+E5DEA2755975D4BAAFA3DAF5E6A695C1338F3298B3836B07EE39FD1E61B7BC95.
+The official Noto font lacks U+18CFF, so an
+attempt to render that sign with this particular file yields
+XSR-GLYPH-MISSING; a font with its outline can render it.
+
+Unicode sources for these rules are [Unicode 18 chapter 18, section 18.12](https://www.unicode.org/versions/Unicode18.0.0/core-spec/chapter-18/),
+the [Unicode 18 names list for U+18B00..U+18CFF](https://www.unicode.org/Public/18.0.0/charts/nameslist/18b00/),
+and the [Khitan cluster proposal figures](https://www.unicode.org/L2/L2018/18121r-n4943-khitan-cluster.pdf).
+The current Unicode chapter defines U+16FE4 as the Type B marker; older
+proposal examples using CGJ are not the 0.8 syntax.
 
 ## EHFC support
 
@@ -188,7 +251,7 @@ optical perfection.
   contextual suffix registration keeps rotation selectors in Egyptian runs.
 
 Hosts may omit the detector, load `xsr-core` and `xsr-egyptian`, and call
-`\xsr_dispatch_run:nn{egyptian}{...}` with a complete run. The generic core and detector are unchanged in 0.7 apart from version metadata.
+`\xsr_dispatch_run:nn{egyptian}{...}` with a complete run. The generic registry and detector now support contextual infix separators.
 Direction, semantic validation and editorial context remain in the Egyptian backend.
 
 Font contents are fingerprinted in request/cache identities and checked when TeX
@@ -216,7 +279,7 @@ to the output directory and controls resolution of discovered relative font path
 Literal `\xsrEgyptianText` arguments are discovered with balanced TeX argument
 braces. If direction commands occur in the sources, both LTR and RTL responses
 are prepared. Each distinct run is prepared for every discovered or explicit font; repeated runs
-share responses. Literal path spellings are retained for TeX request identity.
+share responses. Literal path spellings are retained for TeX request identity. Khitan font selections and cluster-gap settings are prepared separately from Egyptian profiles.
 This deliberately scans source, not TeX execution: it does not expand macros,
 interpret conditionals, follow unbraced/computed input names, or discover the
 verbatim `\xsrEgyptianFontPath` command. Use forward-slash font commands for automatic
@@ -251,10 +314,13 @@ so an unsuccessful invocation cannot silently reuse an earlier successful respon
 python -m pip install '.[test]'
 python scripts/fetch_noto.py
 python scripts/fetch_newgardiner.py
+python scripts/fetch_khitan.py
 python -m pytest
-python -m pytest tests/test_tex_integration.py
+python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py
 python scripts/build_showcase.py --font tmp/fonts/NotoSansEgyptianHieroglyphs-Regular.ttf --font tmp/fonts/NewGardiner.ttf --font C:/Windows/Fonts/seguihis.ttf
 python scripts/check_showcase.py examples/egyptian-showcase.pdf
+python scripts/build_khitan_showcase.py --font tmp/fonts/NotoSerifKhitanSmallScript-Regular.ttf --comparison-font D:/_INBOX/Download/KhitanSmallLinear.ttf
+python scripts/check_khitan_showcase.py examples/khitan-showcase.pdf
 ```
 
 The builder accepts two or three fonts and compiles in a fresh temporary directory
@@ -266,9 +332,9 @@ paragraph wrapping and combinations. The older
 [font-metrics showcase](examples/font-metrics-showcase.pdf) is the historical 0.4 baseline.
 
 [GitHub Actions](.github/workflows/ci.yml) installs the package on Ubuntu 24.04 with
-Python 3.11, focused TeX Live packages and Poppler; downloads checksum-verified Noto and NewGardiner
+Python 3.11, focused TeX Live packages and Poppler; downloads checksum-verified Noto Egyptian, NewGardiner and Noto Khitan
 from their official repositories at runtime; verifies Hieropy is absent, runs
-all tests plus separate XeLaTeX integration, and rebuilds a two-font showcase. Test reports, PDF and page images are artifacts, never automatic
+all tests plus separate XeLaTeX integration, and rebuilds both showcases. Test reports, PDF and page images are artifacts, never automatic
 commits. NewGardiner is fetched from its pinned official upstream revision; Segoe is
 optional on Windows. No external fonts are vendored. Noto can also be selected with `XSR_NOTO_FONT`; additional test
 fonts use `XSR_TEST_FONTS` (an `os.pathsep`-separated list).

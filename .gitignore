@@ -19,3 +19,4 @@ dist/
 tmp/
 
 !examples/egyptian-showcase.pdf
+!examples/khitan-showcase.pdf

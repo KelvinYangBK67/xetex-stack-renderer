@@ -1,0 +1,135 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesExplPackage{xsr-khitan}{2026-10-05}{0.8}
+  {Native Khitan Small Script fixed-stack backend}
+\RequirePackage{xsr-core}
+\RequirePackage{pgf}
+\ExplSyntaxOn
+
+\tl_new:N \l_xsr_khitan_font_path_tl
+\tl_new:N \l_xsr_khitan_font_digest_tl
+\tl_new:N \l_xsr_khitan_font_codepoints_tl
+\tl_new:N \l_xsr_khitan_gap_tl
+\tl_set:Nn \l_xsr_khitan_gap_tl {0.2}
+\msg_new:nnn{xsr-khitan}{font-required}
+  {[XSR-FONT-NOT-SELECTED]~Select~a~Khitan~font~with~\string\xsrKhitanFont.}
+\msg_new:nnn{xsr-khitan}{font-missing}
+  {[XSR-FONT-MISSING]~Khitan~font~file~is~missing~or~unreadable.}
+\msg_new:nnn{xsr-khitan}{font-changed}
+  {[XSR-STALE]~Khitan~font~file~changed;~regenerate~the~response.}
+\msg_new:nnn{xsr-khitan}{font-path}
+  {[XSR-FONT-PATH]~Font~path~contains~a~reserved~TeX/XeTeX~character.}
+\cs_new_protected:Npn \xsr_khitan_select:n #1
+  {
+    \regex_match:nnT { [\x{0000}\x{000A}\x{000D}"\{\}\%\#\[\]] } {#1}
+      {\msg_fatal:nn{xsr-khitan}{font-path}}
+    \tl_set:Nn \l_xsr_khitan_font_path_tl {#1}
+  }
+\NewDocumentCommand \xsrKhitanFont {m}{\xsr_khitan_select:n{#1}}
+\NewDocumentCommand \xsrKhitanDefaultFont {m}
+  {
+    \xsr_khitan_select:n{#1}
+    \tl_gset_eq:NN \l_xsr_khitan_font_path_tl \l_xsr_khitan_font_path_tl
+  }
+\NewDocumentCommand \xsrKhitanFontPath {v}
+  {
+    \tl_set:Nn \l_tmpa_tl {#1}
+    \exp_args:NNx \tl_replace_all:Nnn \l_tmpa_tl {\c_backslash_str} {/}
+    \exp_args:NV \xsr_khitan_select:n \l_tmpa_tl
+  }
+\NewDocumentCommand \xsrKhitanClusterGap {m}
+  {\tl_set:Nn \l_xsr_khitan_gap_tl {#1}}
+\msg_new:nnn{xsr-khitan}{writing-mode}
+  {[XSR-WRITING-MODE-UNSUPPORTED]~Khitan~0.8~supports~horizontal~host~text~only.}
+\NewDocumentCommand \xsrKhitanWritingMode {m}
+  {\str_if_eq:nnF{#1}{horizontal}{\msg_fatal:nn{xsr-khitan}{writing-mode}}}
+\NewDocumentCommand \xsrKhitanText {m}
+  {\exp_args:Nnx \xsr_dispatch_run:nn{khitan}{\tl_to_str:n{#1}}}
+\cs_new_protected:Npn \xsr_khitan_decode:n #1
+  {
+    \tl_clear:N \l_xsr_khitan_font_path_tl
+    \clist_map_inline:nn {#1}
+      {\tl_put_right:Nx \l_xsr_khitan_font_path_tl
+        {\char_generate:nn{\int_from_hex:n{##1}}{12}}}
+  }
+\cs_new_protected:Npn \xsr_khitan_render:nn #1#2
+  {
+    \group_begin:
+      \tl_if_empty:NT \l_xsr_khitan_font_path_tl
+        {\msg_fatal:nn{xsr-khitan}{font-required}}
+      \tl_set:Nx \l_xsr_khitan_font_digest_tl
+        {\file_mdfive_hash:V \l_xsr_khitan_font_path_tl}
+      \tl_if_empty:NT \l_xsr_khitan_font_digest_tl
+        {\msg_fatal:nn{xsr-khitan}{font-missing}}
+      \tl_clear:N \l_xsr_khitan_font_codepoints_tl
+      \str_map_inline:Vn \l_xsr_khitan_font_path_tl
+        {\tl_put_right:Nx \l_xsr_khitan_font_codepoints_tl
+          {\int_to_Hex:n{`##1},}}
+      \tl_set:Nx \l_xsr_khitan_font_codepoints_tl
+        {\tl_range:Nnn \l_xsr_khitan_font_codepoints_tl {1}{-2}}
+      \tl_set:Nx \g_xsr_renderer_options_tl
+        {
+          \c_left_brace_str
+          "cluster_gap":\l_xsr_khitan_gap_tl,
+          "font_codepoints":"\l_xsr_khitan_font_codepoints_tl",
+          "font_digest":"\l_xsr_khitan_font_digest_tl"
+          \c_right_brace_str
+        }
+      \xsr_external_render:nn{#1}{#2}
+    \group_end:
+  }
+\cs_generate_variant:Nn \file_mdfive_hash:n {V}
+\cs_generate_variant:Nn \str_map_inline:nn {Vn}
+\xsr_register_backend:nnn{khitan}{native-fixed-stack-0.8}{xsr_khitan_render:nn}
+\NewDocumentCommand \xsrKhitanUseFont {m m m}
+  {
+    \group_begin:
+      \xsr_khitan_decode:n{#1}
+      \str_if_eq:eeF
+        {\file_mdfive_hash:V \l_xsr_khitan_font_path_tl}{#2}
+        {\msg_fatal:nn{xsr-khitan}{font-changed}}
+      \tex_font:D \l_xsr_khitan_font =
+        "[\l_xsr_khitan_font_path_tl]"~at~\f@size pt\scan_stop:
+      \l_xsr_khitan_font #3
+    \group_end:
+  }
+\dim_new:N \l_xsr_khitan_em_dim
+\dim_new:N \l_xsr_khitan_height_dim
+\NewDocumentCommand \xsrKhitanGlyph {m m m m m}
+  {
+    \pgfscope
+      \pgftransformshift{\pgfpoint
+        {\dim_eval:n{\fp_eval:n{#2-#4}\l_xsr_khitan_em_dim}}
+        {\dim_eval:n{\l_xsr_khitan_height_dim-
+          \fp_eval:n{#3+#5}\l_xsr_khitan_em_dim}}}
+      \pgftext[left,base]
+        {\l_xsr_khitan_font\XeTeXglyph\XeTeXcharglyph
+          \int_from_hex:n{#1}\scan_stop:}
+    \endpgfscope
+  }
+\NewDocumentCommand \xsrKhitanLayout {m m m m m}
+  {
+    \group_begin:
+      \dim_set:Nn \l_xsr_khitan_em_dim {\f@size pt}
+      \dim_set:Nn \l_xsr_khitan_height_dim {#2\l_xsr_khitan_em_dim}
+      \iow_term:x{XSR-LAYOUT~script=khitan~glyphs=#4~width=#1~height=#2~depth=#3}
+      \mode_leave_vertical:
+      \hbox{\pgfpicture
+        \pgfpathrectangle{\pgfpoint{0pt}{-#3\l_xsr_khitan_em_dim}}
+          {\pgfpoint{#1\l_xsr_khitan_em_dim}
+            {\dim_eval:n{#2\l_xsr_khitan_em_dim+#3\l_xsr_khitan_em_dim}}}
+        \pgfusepath{use~as~bounding~box}
+        \pgfinterruptboundingbox #5 \endpgfinterruptboundingbox
+      \endpgfpicture}
+    \group_end:
+  }
+\NewDocumentCommand \xsrKhitanBreak {m}
+  {\penalty0\hskip #1em\relax}
+\cs_if_exist:NT \xsr_active_detector_register:nn
+  {
+    \xsr_active_detector_register:nn{khitan}{18B00-18CDA,18CFF-18CFF}
+    \xsr_active_detector_register_suffix:nnn{khitan}{"16FE4}{"16FE4}
+    \xsr_active_detector_register_suffix:nnn{khitan}{"200B}{"200B}
+    \xsr_active_detector_register_space_infix:n{khitan}
+  }
+\ExplSyntaxOff
+\endinput

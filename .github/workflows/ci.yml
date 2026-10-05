@@ -39,18 +39,32 @@ jobs:
         run: |
           python scripts/fetch_noto.py
           python scripts/fetch_newgardiner.py
+          python scripts/fetch_khitan.py
       - name: Verify generated Unicode semantics
         run: python scripts/generate_unicode_data.py --check
       - name: Verify Python, geometry, fonts and XeLaTeX
         run: python -m pytest -ra --junitxml=tmp/test-results.xml
       - name: Verify XeLaTeX integration separately
-        run: python -m pytest tests/test_tex_integration.py -q
+        run: python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py -q
       - name: Rebuild visual showcase without shell escape
         shell: bash
         run: |
           python scripts/build_showcase.py --font tmp/fonts/NotoSansEgyptianHieroglyphs-Regular.ttf --font tmp/fonts/NewGardiner.ttf --output tmp/ci-showcase.pdf
           python scripts/check_showcase.py tmp/ci-showcase.pdf
           pdftoppm -scale-to 1400 -png tmp/ci-showcase.pdf tmp/ci-showcase
+      - name: Rebuild Khitan showcase without shell escape
+        shell: bash
+        run: |
+          python scripts/build_khitan_showcase.py --font tmp/fonts/NotoSerifKhitanSmallScript-Regular.ttf --output tmp/ci-khitan-showcase.pdf
+          python scripts/check_khitan_showcase.py tmp/ci-khitan-showcase.pdf
+          pdftoppm -scale-to 1400 -png tmp/ci-khitan-showcase.pdf tmp/ci-khitan-showcase
+      - name: Verify no external font binary is tracked
+        shell: bash
+        run: |
+          if git ls-files '*.ttf' '*.otf' '*.woff*' | grep .; then
+            echo 'External font binary is tracked' >&2
+            exit 1
+          fi
       - name: Upload test report and visual artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -60,5 +74,8 @@ jobs:
             tmp/test-results.xml
             tmp/ci-showcase.pdf
             tmp/ci-showcase-*.png
+            tmp/ci-khitan-showcase.pdf
+            tmp/ci-khitan-showcase-*.png
+            tmp/pdfs/khitan-showcase-build.log
             tmp/pdfs/showcase-build.log
           if-no-files-found: warn

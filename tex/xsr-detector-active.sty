@@ -1,8 +1,8 @@
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesExplPackage
   {xsr-detector-active}
-  {2026-10-03}
-  {0.7}
+  {2026-10-05}
+  {0.8}
   {Standalone active-character run detector for xetex-stack-renderer}
 
 \RequirePackage{xsr-core}
@@ -13,6 +13,7 @@
   { Script~'#1'~has~already~been~registered~with~the~active~detector. }
 
 \prop_new:N \g_xsr_active_detector_script_prop
+\prop_new:N \g_xsr_active_detector_space_infix_prop
 \seq_new:N \l_xsr_active_detector_range_parts_seq
 \int_new:N \l_xsr_active_detector_range_start_int
 \int_new:N \l_xsr_active_detector_range_end_int
@@ -117,6 +118,22 @@
       }
   }
 
+% A registered script may retain an ordinary source space only when the next
+% active character belongs to that same script. Other spaces stay ordinary TeX.
+\cs_new_protected:Npn \xsr_active_detector_register_space_infix:n #1
+  {\prop_gput:Nnn \g_xsr_active_detector_space_infix_prop {#1} {1}}
+\cs_generate_variant:Nn \prop_if_in:NnTF {NVTF}
+\cs_new_protected:Npn \xsr_active_detector_after_space:
+  {
+    \tl_set:Nx \l_xsr_active_detector_next_meaning_tl
+      {\token_to_meaning:N \l_peek_token}
+    \exp_args:NVV \str_if_in:nnTF
+      \l_xsr_active_detector_next_meaning_tl
+      \l_xsr_active_detector_script_tl
+      {\tl_put_right:Nx \l_xsr_active_detector_run_tl
+         {\char_generate:nn{32}{12}}}
+      {\xsr_active_detector_flush: \space}
+  }
 \cs_new_protected:Npn \xsr_active_detector_maybe_flush:
   {
     \tl_set:Nx \l_xsr_active_detector_next_meaning_tl
@@ -125,7 +142,16 @@
       \l_xsr_active_detector_next_meaning_tl
       \c_xsr_active_detector_marker_tl
       { }
-      { \xsr_active_detector_flush: }
+      {
+        \prop_if_in:NVTF \g_xsr_active_detector_space_infix_prop
+          \l_xsr_active_detector_script_tl
+          {
+            \peek_meaning_remove:NTF \c_space_token
+              {\peek_after:Nw \xsr_active_detector_after_space:}
+              {\xsr_active_detector_flush:}
+          }
+          {\xsr_active_detector_flush:}
+      }
   }
 
 \cs_new_protected:Npn \xsr_active_detector_collect:nn #1#2

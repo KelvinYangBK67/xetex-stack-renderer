@@ -1,8 +1,8 @@
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesExplPackage
   {xetex-stack-renderer}
-  {2026-10-03}
-  {0.7}
+  {2026-10-05}
+  {0.8}
   {Unicode-driven stack rendering framework for XeTeX}
 
 \RequirePackage{xsr-core}
@@ -31,6 +31,7 @@
 % load xsr-core plus a backend and call \xsr_dispatch_run:nn directly.
 \RequirePackage{xsr-detector-active}
 \RequirePackage{xsr-egyptian}
+\RequirePackage{xsr-khitan}
 
 \ExplSyntaxOff
 

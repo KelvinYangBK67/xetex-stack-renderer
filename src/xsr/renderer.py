@@ -93,6 +93,11 @@ class Renderer:
         except KeyError as error:
             raise ValueError(f'unknown backend: {script}') from error
 
+    def preprocess_extras(self, script: str, sources: Sequence[str]) -> list[dict[str, object]]:
+        """Ask the backend for its literal source option variants."""
+        backend = self._backends[script]
+        discover = getattr(backend, 'preprocess_extras', None)
+        return discover(sources) if discover is not None else [{}]
     def render(
         self,
         script: str,
@@ -124,9 +129,11 @@ class Renderer:
 
 def default_renderer(cache_dir: str | Path | None = None) -> Renderer:
     from .egyptian import EgyptianBackend
+    from .khitan import KhitanBackend
 
     renderer = Renderer(RenderCache(cache_dir) if cache_dir is not None else None)
     renderer.register(EgyptianBackend())
+    renderer.register(KhitanBackend())
     return renderer
 
 

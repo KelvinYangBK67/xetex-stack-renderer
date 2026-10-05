@@ -1,8 +1,8 @@
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesExplPackage
   {xsr-core}
-  {2026-10-03}
-  {0.7}
+  {2026-10-05}
+  {0.8}
   {Core run dispatcher for xetex-stack-renderer}
 
 \RequirePackage{expl3}
@@ -97,7 +97,7 @@
     \prop_get:NnN
       \g_xsr_backend_version_prop {#1} \l_xsr_backend_version_tl
     \seq_clear:N \l_xsr_codepoints_seq
-    \tl_map_inline:nn {#2}
+    \str_map_inline:nn {#2}
       {
         \seq_put_right:Nx \l_xsr_codepoints_seq
           { \int_to_Hex:n { `##1 } }

@@ -1,0 +1,82 @@
+\documentclass[12pt]{article}
+\usepackage[margin=24mm]{geometry}
+\usepackage[mode=preprocess]{xetex-stack-renderer}
+\input{khitan-showcase-fonts.tex}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\newcommand\PageTitle[1]{\section*{XSR 0.8 | Khitan Small Script}\textbf{#1}\par\smallskip\hrule\medskip}
+\newcommand\Sample[2]{\par\noindent\makebox[41mm][l]{#1}\xsrKhitanText{#2}\par\medskip}
+\begin{document}
+\PageTitle{Type A: fixed order, original outlines}
+The default Type A cluster begins with two signs side by side.
+Signs are read left to right, then top to bottom. A final odd sign is centered.
+The glyphs below retain their original Noto size and shape; the stack grows by rows.
+\par\medskip
+\Sample{Single sign}{𘬁}
+\Sample{2 signs}{𘬁𘬂}
+\Sample{3 signs}{𘬁𘬂𘬃}
+\Sample{4 signs}{𘬁𘬂𘬃𘬁}
+\Sample{5 signs}{𘬁𘬂𘬃𘬁𘬂}
+\Sample{6 signs}{𘬁𘬂𘬃𘬁𘬂𘬃}
+\Sample{7 signs}{𘬁𘬂𘬃𘬁𘬂𘬃𘬁}
+\Sample{8 signs}{𘬁𘬂𘬃𘬁𘬂𘬃𘬁𘬂}
+\vfill
+\textit{The last example occupies four intrinsic rows. No stack is squeezed into one em.}
+\newpage
+\PageTitle{Type B and cluster boundaries}
+U+16FE4 after the first sign changes a cluster to Type B: its first sign
+is centered above the remaining paired rows. The filler itself has no outline.
+\par\medskip
+\Sample{Type B, 2 signs}{𘬁𖿤𘬂}
+\Sample{Type B, 3 signs}{𘬁𖿤𘬂𘬃}
+\Sample{Type B, 4 signs}{𘬁𖿤𘬂𘬃𘬁}
+\Sample{Type B, 7 signs}{𘬁𖿤𘬂𘬃𘬁𘬂𘬃𘬁}
+\par\bigskip
+\textbf{SPACE versus ZERO WIDTH SPACE}\par
+The first pair uses a narrow XSR gap of 0.2 em. The second has no visible gap.
+Both are legal break opportunities between indivisible clusters.
+\Sample{U+0020 SPACE}{𘬁𘬂 𘬁𘬂}
+\Sample{U+200B ZWSP}{𘬁𘬂​𘬁𘬂}
+\Sample{Iteration mark}{𘬀𘬁𘬂}
+\vfill
+\textit{U+18B00 is rendered as its own sign; semantic repetition is not duplicated graphically.}
+\newpage
+\PageTitle{Horizontal text and intrinsic line height}
+Each cluster is an upright atomic box aligned at the bottom of the text line.
+Only a line containing a tall cluster requires extra vertical extent.
+\par\bigskip
+\noindent Line one: ordinary Latin text and normal spacing.\par
+\noindent Line two: ordinary Latin text and normal spacing.\par
+\noindent Line three: a four-row cluster \xsrKhitanText{𘬁𘬂𘬃𘬁𘬂𘬃𘬁𘬂} in a Latin sentence.\par
+\noindent Line four: ordinary Latin text resumes.\par
+\noindent Line five: ordinary Latin text resumes.\par
+\bigskip
+A two-cluster run in a sentence: before \xsrKhitanText{𘬁𘬂 𘬁𘬂} after.
+The source SPACE becomes the narrow Khitan separator, while surrounding
+Latin spaces remain ordinary spaces.
+\par\medskip
+A zero-width boundary: before \xsrKhitanText{𘬁𘬂​𘬁𘬂} after.
+\vfill
+\textit{The same internal stack can later be embedded in a vertical host flow.}
+\newpage
+\PageTitle{Reference comparison with Noto native shaping}
+The upper row in each pair is XSR's unscaled base outlines in fixed Unicode
+slots. The lower row asks XeTeX to apply Noto's contextual rclt feature.
+Noto may use positional alternates and optical refinements; XSR does not.
+\par\bigskip
+\textbf{Type A, three signs}\par
+XSR:\quad \xsrKhitanText{𘬁𘬂𘬃}\par
+Noto native:\quad {\KhitanNative\detokenize{𘬁𘬂𘬃}}\par\bigskip
+\textbf{Type A, six signs}\par
+XSR:\quad \xsrKhitanText{𘬁𘬂𘬃𘬁𘬂𘬃}\par
+Noto native:\quad {\KhitanNative\detokenize{𘬁𘬂𘬃𘬁𘬂𘬃}}\par\bigskip
+\textbf{Type B, four signs}\par
+XSR:\quad \xsrKhitanText{𘬁𖿤𘬂𘬃𘬁}\par
+Noto native:\quad {\KhitanNative\detokenize{𘬁𖿤𘬂𘬃𘬁}}\par\bigskip
+\textbf{Repeated signs, eight positions}\par
+XSR:\quad \xsrKhitanText{𘬁𘬂𘬁𘬂𘬁𘬂𘬁𘬂}\par
+Noto native:\quad {\KhitanNative\detokenize{𘬁𘬂𘬁𘬂𘬁𘬂𘬁𘬂}}
+\vfill
+\textit{Native Noto shaping is a reference only. XSR works without Khitan GSUB.}
+\input{khitan-extra.tex}
+\end{document}

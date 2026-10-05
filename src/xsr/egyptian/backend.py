@@ -54,6 +54,12 @@ class EgyptianBackend:
     def __init__(self, parser: EgyptianParser | None = None) -> None:
         self.parser = parser or EgyptianParser()
 
+    @staticmethod
+    def preprocess_extras(sources) -> list[dict[str, object]]:
+        if any('xsrEgyptianDirection' in source for source in sources):
+            return [{}, {'direction': 'rtl'}]
+        return [{}]
+
     def prepare_options(self, options: Mapping[str, object]) -> dict[str, object]:
         font = options_font(options)
         direction=layout_options(options)

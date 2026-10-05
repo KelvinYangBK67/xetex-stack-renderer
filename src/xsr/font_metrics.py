@@ -49,7 +49,7 @@ def options_font(options) -> 'FontMetrics':
     path = (decode_path(options['font_codepoints']) if options.get('font_codepoints')
             else options.get('font_path'))
     if not path:
-        raise XSRError('XSR-FONT-NOT-SELECTED', 'Egyptian rendering requires an explicit font_path; use \\xsrEgyptianDefaultFont')
+        raise XSRError('XSR-FONT-NOT-SELECTED', 'rendering requires an explicit font_path; select a script font file')
     return load_font(path, options.get('font_digest'))
 
 
