@@ -18,8 +18,8 @@ FONT = re.compile(r'\\xsr([A-Za-z]+?)(?:DefaultFont|Font)\s*\{([^{}]+)\}')
 
 
 def discover_sources(inputs):
-    found, active = {}, set()
-    roots = [Path(p).resolve().parent for p in inputs]
+    from .source_traversal import SourceMap, resolve_include
+    found, active = SourceMap(inputs), set()
 
     def visit(path):
         path = path.resolve()
@@ -35,14 +35,7 @@ def discover_sources(inputs):
         found[path] = (raw, source)
         active.add(path)
         for target in INCLUDE.findall(source):
-            if '\\' in target or '#' in target:
-                raise XSRError('XSR-PREPROCESS', f'input/include must be a literal filename: {target}')
-            child = Path(target)
-            if not child.suffix:
-                child = child.with_suffix('.tex')
-            candidates = [root / child for root in roots] + [path.parent / child]
-            resolved = next((p for p in candidates if p.is_file()), candidates[0])
-            visit(resolved)
+            visit(resolve_include(found, path, target))
         active.remove(path)
 
     for path in inputs:

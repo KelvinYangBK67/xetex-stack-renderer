@@ -2,6 +2,7 @@
 import re
 from pathlib import Path
 from .errors import XSRError
+from .source_traversal import entrypoints, resolve_include
 from .vector_backend import input_options
 from .renderer import request_digest, response_filename, write_tex
 
@@ -13,12 +14,13 @@ TOKEN = re.compile(COMMAND.pattern + '|' + INCLUDE.pattern + r'|[{}]')
 def prepare_vectors(sources, workdir, output_dir, jobname, renderer):
     runs, emitted = [], set()
     state = {'provider': '', 'style': 'serif', 'missing_glyph_policy': 'box'}
-    stack, visited = [], set()
-    roots = [path.parent for path in sources]
+    stack, active = [], set()
 
     def visit(path):
         nonlocal state
-        visited.add(path)
+        if path in active:
+            raise XSRError('XSR-PREPROCESS', f'cyclic input/include at {path}')
+        active.add(path)
         source = sources[path][1]
         for token in TOKEN.finditer(source):
             value = token.group()
@@ -31,13 +33,7 @@ def prepare_vectors(sources, workdir, output_dir, jobname, renderer):
                 continue
             include = INCLUDE.fullmatch(value)
             if include:
-                child = Path(include[1])
-                if not child.suffix:
-                    child = child.with_suffix('.tex')
-                candidates = [(root/child).resolve() for root in roots] + [(path.parent/child).resolve()]
-                target = next((candidate for candidate in candidates if candidate in sources), None)
-                if target is not None:
-                    visit(target)
+                visit(resolve_include(sources, path, include[1]))
                 continue
             match = COMMAND.fullmatch(value)
             command, value = match.groups()
@@ -82,7 +78,8 @@ def prepare_vectors(sources, workdir, output_dir, jobname, renderer):
                              options=options, source=str(path), start=token.start(), end=token.end(),
                              codepoints=[f'{ord(c):X}' for c in text], response=filename))
 
-    for path in sources:
-        if path not in visited:
-            visit(path)
+        active.remove(path)
+
+    for path in entrypoints(sources):
+        visit(path)
     return runs

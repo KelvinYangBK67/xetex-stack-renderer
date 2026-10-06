@@ -2,18 +2,20 @@
 from pathlib import Path
 import re
 from .errors import XSRError
+from .source_traversal import entrypoints, resolve_include
 
 TOKEN = re.compile(r'\\xsrMissingGlyphPolicy\s*\{([^{}]*)\}|\\(?:input|include)\s*\{([^{}]+)\}|[{}]')
 
 
 def policy_spans(sources):
     result = {path: [] for path in sources}
-    visited, stack, state = set(), [], 'box'
-    roots = [path.parent for path in sources]
+    active, stack, state = set(), [], 'box'
 
     def visit(path):
         nonlocal state
-        visited.add(path)
+        if path in active:
+            raise XSRError('XSR-PREPROCESS', f'cyclic input/include at {path}')
+        active.add(path)
         source = sources[path][1]
         cursor = 0
         for token in TOKEN.finditer(source):
@@ -24,19 +26,15 @@ def policy_spans(sources):
                     raise XSRError('XSR-MISSING-POLICY', 'use box or error')
                 state = token[1]
             elif token[2] is not None:
-                child = Path(token[2])
-                if not child.suffix:
-                    child = child.with_suffix('.tex')
-                target = next(((root/child).resolve() for root in roots if (root/child).resolve() in sources), None)
-                if target is not None:
-                    visit(target)
+                visit(resolve_include(sources, path, token[2]))
             elif token.group() == '{':
                 stack.append(state)
             elif stack:
                 state = stack.pop()
         result[path].append((cursor, len(source)+1, state))
 
-    for path in sources:
-        if path not in visited:
-            visit(path)
+        active.remove(path)
+
+    for path in entrypoints(sources):
+        visit(path)
     return result
