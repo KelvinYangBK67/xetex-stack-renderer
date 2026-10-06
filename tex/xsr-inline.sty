@@ -13,6 +13,8 @@
 \dim_new:N \l_xsr_inline_width_dim
 \dim_new:N \l_xsr_inline_height_dim
 \dim_new:N \l_xsr_inline_shift_dim
+\dim_new:N \l_xsr_inline_bias_dim
+\tl_new:N \l_xsr_inline_alignment_tl
 \dim_new:N \l_xsr_inline_left_dim
 \dim_new:N \l_xsr_inline_right_dim
 \dim_new:N \l_xsr_inline_top_dim
@@ -48,15 +50,21 @@
    \iffontchar\font"56FD
      \dim_set:Nn\l_xsr_inline_center_dim{(\fontcharht\font"56FD-\fontchardp\font"56FD)/2}
    \fi}
+% The first response argument carries {alignment}{optical-bias-fraction}.
+\cs_new_protected:Npn\xsr_inline_policy:nn #1#2
+  {\tl_set:Nn\l_xsr_inline_alignment_tl{#1}
+   \dim_set:Nn\l_xsr_inline_bias_dim{#2\l_xsr_inline_unit_dim}}
 \NewDocumentCommand\xsrInlineGlyph{m m m m m m m m m}
   {\group_begin:
    \xsr_inline_cell_metrics:
    \dim_set:Nn\l_xsr_inline_unit_dim{\fp_use:N\l_xsr_inline_scale_fp\l_xsr_inline_cell_dim}
+   \xsr_inline_policy:nn #1
    \dim_set:Nn\l_xsr_inline_width_dim{#2\l_xsr_inline_unit_dim}
    \dim_set:Nn\l_xsr_inline_height_dim{#3\l_xsr_inline_unit_dim}
    \dim_set:Nn\l_xsr_inline_shift_dim{\l_xsr_inline_center_dim-.5\l_xsr_inline_cell_dim+\l_xsr_inline_raise_dim}
-   \str_if_eq:nnT{#1}{center}
+   \str_if_eq:VnT\l_xsr_inline_alignment_tl{center}
      {\dim_set:Nn\l_xsr_inline_shift_dim{\l_xsr_inline_center_dim-.5\l_xsr_inline_height_dim+\l_xsr_inline_raise_dim}}
+   \dim_add:Nn\l_xsr_inline_shift_dim{\l_xsr_inline_bias_dim}
    \dim_set:Nn\l_xsr_inline_left_dim{#4\l_xsr_inline_unit_dim}
    \dim_set:Nn\l_xsr_inline_right_dim{#6\l_xsr_inline_unit_dim}
    \dim_set:Nn\l_xsr_inline_bottom_dim{#5\l_xsr_inline_unit_dim+\l_xsr_inline_shift_dim}
@@ -65,7 +73,7 @@
    \dim_compare:nNnT{\l_xsr_inline_top_dim}<{0pt}{\dim_zero:N\l_xsr_inline_top_dim}
    \dim_set:Nn\l_xsr_inline_side_dim{#8\l_xsr_inline_width_dim}
    \dim_set_eq:NN\l_xsr_vector_em_dim\l_xsr_inline_height_dim
-   \iow_term:x{XSR-INLINE~alignment=#1~canvas-width=\dim_use:N\l_xsr_inline_width_dim
+   \iow_term:x{XSR-INLINE~alignment=\l_xsr_inline_alignment_tl~canvas-width=\dim_use:N\l_xsr_inline_width_dim
      ~canvas-height=\dim_use:N\l_xsr_inline_height_dim
      ~advance=\dim_eval:n{\l_xsr_inline_right_dim-\l_xsr_inline_left_dim+2\l_xsr_inline_side_dim}
      ~height=\dim_use:N\l_xsr_inline_top_dim~depth=\dim_eval:n{-\l_xsr_inline_bottom_dim}}
@@ -115,6 +123,6 @@
    \tl_set:Nx\g_xsr_renderer_options_tl
     {\c_left_brace_str"source_codepoints":"\l_xsr_vector_codes_tl","source_digest":"\l_xsr_vector_digest_tl"\c_right_brace_str}
    \xsr_vector_request:nn{asset}{}}
-\xsr_register_backend:nnn{asset}{inline-0.10}{xsr_vector_request:nn}
+\xsr_register_backend:nnn{asset}{inline-0.10-optical-1}{xsr_vector_request:nn}
 \ExplSyntaxOff
 \endinput

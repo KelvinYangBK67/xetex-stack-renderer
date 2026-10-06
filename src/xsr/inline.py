@@ -16,7 +16,7 @@ from .font_metrics import encode_path, tex_font_path
 from .synthetic import warn
 from .vector import ExternalVectorGlyph, import_svg, number, paths_tex
 
-INLINE_VERSION = 'inline-0.10'
+INLINE_VERSION = 'inline-0.10-optical-1'
 
 
 @dataclass(frozen=True)
@@ -24,12 +24,14 @@ class GlyphPolicy:
     alpha: float
     alignment: str
     side_bearing_fraction: float = 0.
+    vertical_bias_fraction: float = 0.
 
 
 VECTOR_POLICY = GlyphPolicy(1., 'baseline')
 # Small, explicit image-canvas side bearings, like ordinary font side bearings.
 # The complete canvas is drawn; this is spacing, never cropping or distortion.
-IMAGE_POLICY = GlyphPolicy(1.10, 'center', -.02)
+IMAGE_POLICY = GlyphPolicy(1.10, 'center', side_bearing_fraction=-.02,
+                           vertical_bias_fraction=-.12)
 
 
 @dataclass(frozen=True)
@@ -141,14 +143,15 @@ def asset_policy(asset):
 
 def layout_inline(asset, cell=IdeographicCell(), *, scale=1., raise_by=0., policy=None):
     policy = policy or asset_policy(asset)
-    if not all(math.isfinite(v) for v in (cell.size,cell.center,scale,raise_by,policy.alpha)) or min(cell.size,scale,policy.alpha) <= 0:
+    if not all(math.isfinite(v) for v in (cell.size,cell.center,scale,raise_by,policy.alpha,policy.vertical_bias_fraction)) or min(cell.size,scale,policy.alpha) <= 0:
         raise XSRError('XSR-INLINE-GEOMETRY', 'cell, alpha and uniform scale must be finite and positive; raise must be finite')
     ratio = asset.aspect_ratio
     if ratio > 16 or ratio < 1/16:
         warn('XSR-INLINE-ASPECT', f'extreme canvas aspect ratio {ratio:g}; retained without clamping')
     width = policy.alpha*cell.size*scale*math.sqrt(ratio)
     height = policy.alpha*cell.size*scale/math.sqrt(ratio)
-    shift = (cell.center-height/2 if policy.alignment == 'center' else -cell.depth) + raise_by
+    shift = ((cell.center-height/2 if policy.alignment == 'center' else -cell.depth)
+             + policy.vertical_bias_fraction*cell.size*scale + raise_by)
     bounds = (0.,0.,width,height)
     if isinstance(asset.payload, ExternalVectorGlyph):
         x0,y0,x1,y1 = asset.payload.bounds
@@ -169,7 +172,9 @@ def inline_tex(asset):
         payload = (r'\xsrInlineImage{' + encode_path(asset.payload.path) + '}{'
                    + asset.payload.digest + '}{' + asset.payload.format + '}')
     values = (glyph.canvas_width,glyph.canvas_height,*glyph.bounds,policy.side_bearing_fraction)
-    return (r'\xsrInlineGlyph{' + policy.alignment + '}'
+    # Pack alignment and optical bias in one policy argument (TeX has nine slots).
+    return (r'\xsrInlineGlyph{{' + policy.alignment + '}{'
+            + number(policy.vertical_bias_fraction) + '}}'
             + ''.join('{' + number(v) + '}' for v in values) + '{' + payload + '}')
 
 

@@ -2,7 +2,7 @@
 from pathlib import Path
 import pytest
 from xsr.errors import XSRError
-from xsr.inline import GlyphRegistry, VisualAsset, IdeographicCell, layout_inline, resolve_asset, vector_asset, inline_tex
+from xsr.inline import GlyphRegistry, VisualAsset, IdeographicCell, IMAGE_POLICY, VECTOR_POLICY, layout_inline, resolve_asset, vector_asset, inline_tex
 from xsr.vector import import_svg
 from xsr.synthetic import XSRWarning
 from fixtures.inline_assets import make_asset
@@ -48,7 +48,7 @@ def test_geometric_mean_and_aspect_invariance(ratio,source_class,alpha,scale):
     assert glyph.depth == pytest.approx(max(0,-glyph.shift))
     assert glyph.advance == pytest.approx(glyph.width+2*glyph.side_bearing)
     if source_class=='image':
-        assert glyph.shift+glyph.canvas_height/2 == pytest.approx(4.2+1.25)
+        assert glyph.shift+glyph.canvas_height/2 == pytest.approx(4.2-.12*12*scale+1.25)
         assert glyph.advance == pytest.approx(.96*glyph.canvas_width)
     else:
         assert glyph.side_bearing==0
@@ -59,7 +59,7 @@ def test_tall_and_wide_are_not_clamped():
     tall=layout_inline(VisualAsset(1,4,'image',None,('','')))
     wide=layout_inline(VisualAsset(4,1,'image',None,('','')))
     assert tall.canvas_height==pytest.approx(2.2)
-    assert tall.height==pytest.approx(1.6) and tall.depth==pytest.approx(.6)
+    assert tall.height==pytest.approx(1.48) and tall.depth==pytest.approx(.72)
     assert wide.canvas_width==pytest.approx(2.2)
     assert wide.advance>2
 
@@ -107,3 +107,42 @@ def test_pixels_not_dpi_determine_aspect(tmp_path):
     path=tmp_path/'dpi.png'
     Image.new('RGB',(60,120),'white').save(path,dpi=(72,144))
     assert resolve_asset(path).aspect_ratio==.5
+
+
+
+def test_explicit_source_class_optical_policy():
+    assert IMAGE_POLICY.vertical_bias_fraction == -.12
+    assert VECTOR_POLICY.vertical_bias_fraction == 0
+    assert IMAGE_POLICY.alpha == 1.10 and IMAGE_POLICY.side_bearing_fraction == -.02
+    assert VECTOR_POLICY.alpha == 1 and VECTOR_POLICY.side_bearing_fraction == 0
+
+
+@pytest.mark.parametrize('scale',[.5,1,2])
+def test_optical_bias_scales_and_raise_is_additive(scale):
+    asset=VisualAsset(1,2,'image',None,('',''))
+    cell=IdeographicCell(12,4)
+    glyph=layout_inline(asset,cell,scale=scale,raise_by=2)
+    geometric=cell.center-glyph.canvas_height/2
+    assert glyph.shift==pytest.approx(geometric-.12*cell.size*scale+2)
+    compensated=layout_inline(asset,cell,scale=scale,raise_by=.12*cell.size*scale)
+    assert compensated.shift==pytest.approx(geometric)
+
+
+def test_vector_optical_geometry_unchanged():
+    glyph=layout_inline(VisualAsset(4,1,'vector',None,('','')),IdeographicCell(12,4))
+    assert (glyph.canvas_width,glyph.canvas_height,glyph.shift)==(24,6,-2)
+    assert (glyph.advance,glyph.height,glyph.depth)==(24,4,2)
+
+
+@pytest.mark.parametrize('extension',['png','jpg','pdf'])
+def test_image_policy_uses_metadata_without_loading_or_changing_pixels(tmp_path,monkeypatch,extension):
+    from PIL import Image
+    path=make_asset(tmp_path/('glyph.'+extension),120,240)
+    before=path.read_bytes()
+    def forbidden(*args,**kwargs):
+        raise AssertionError('inline resolution must not decode/process pixels')
+    monkeypatch.setattr(Image.Image,'load',forbidden)
+    asset=resolve_asset(path)
+    glyph=layout_inline(asset)
+    assert glyph.shift==pytest.approx(.5-glyph.canvas_height/2-.12)
+    assert path.read_bytes()==before

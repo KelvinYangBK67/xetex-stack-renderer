@@ -109,8 +109,13 @@ when available; otherwise the reference is an em square above the baseline,
 centered at `C/2`. Hosts can replace the internal cell-metrics hook. There is
 no dependence on an Egyptian/Khitan font selected for a different backend.
 
-Images align their full canvas center to that cell center: `shift=center-h/2`.
-Vectors start at the reference cell baseline. User `raise` is then added.
+Images first align their full canvas center to that cell center, then apply an
+explicit downward optical correction to compensate for common source margins:
+`shift = center - h/2 - 0.12*(C*s) + raise`. The policy bias scales with the same
+ideographic unit as the glyph. PNG, JPEG and manual PDF assets share this policy;
+no pixels or PDF content are inspected. Vectors start at the reference cell
+baseline with zero optical bias. User `raise` remains additive and can compensate
+for the default correction on any particular source.
 Height and depth include the resulting extents; vector ink extending beyond its
 viewBox also enlarges its reported box, without changing the normalization.
 
@@ -158,6 +163,11 @@ brace-scoped provider/style/missing-policy state. Only the active recursion
 stack detects cycles. Include lookup prefers the current parent directory,
 then explicit entrypoint directories in order; previously visited directories
 do not change lookup. Literal traversal is not a general TeX interpreter.
+
+Post-0.10 maintenance keeps the public release number at 0.10 and uses internal
+backend version `inline-0.10-optical-1` for the optical policy/response format;
+old inline responses cannot match the new digest. See the
+[maintenance record](docs/post-0.10-maintenance.md).
 
 0.10 adds no KAGE implementation, Bai-style IDS, zi.tools or GlyphWiki
 integration, IDS-to-geometry, Han-to-IDS lookup, network glyph fetching, IMPE

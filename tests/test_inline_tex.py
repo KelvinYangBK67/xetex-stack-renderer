@@ -57,7 +57,7 @@ def test_no_shell_preprocess_registry_and_repeat(tmp_path,extension):
 
 
 @pytest.mark.parametrize('size,cell',[(r'\small ',9),('',10),(r'\Large ',14.4)])
-@pytest.mark.parametrize('extension',['png','svg'])
+@pytest.mark.parametrize('extension',['png','svg','jpg','pdf'])
 def test_size_scale_and_raise(tmp_path,size,cell,extension):
     path=make_asset(tmp_path/('glyph.'+extension),100,200)
     preamble=fr'\GlyphRegister{{test}}{{glyph.{extension}}}'
@@ -152,7 +152,7 @@ def test_negative_raise_and_all_sizes_share_response(tmp_path):
     make_asset(tmp_path/'glyph.png')
     body=box_body('raise=-3pt')+r'{\small\Glyph{test}}{\Large\Glyph[scale=2]{test}}'
     output=compile_document(tmp_path,body,r'\GlyphRegister{test}{glyph.png}',mode='preprocess',prepare=True)
-    assert measured(output)==pytest.approx((10.56,7.5,3.5),abs=.003)
+    assert measured(output)==pytest.approx((10.56,6.3,4.7),abs=.003)
     assert (tmp_path/'.xsr/vector.responses.tex').read_text().count(r'\xsrDeclareResponse')==1
     assert not list(tmp_path.glob('vector.xsr-*.tex'))
 
@@ -195,3 +195,15 @@ def test_preprocess_literal_options_allow_whitespace(tmp_path):
     make_asset(tmp_path/'glyph.png')
     compile_document(tmp_path,'Before \\Glyph \n [scale=1.2,\nraise=1pt]{test} after.',
                      r'\GlyphRegister{test}{glyph.png}',mode='preprocess',prepare=True)
+
+
+
+def test_old_policy_bundle_cannot_be_reused(tmp_path):
+    from xsr.bundle import write_bundle
+    from xsr.renderer import request_digest
+    from xsr.vector_backend import input_options
+    path=make_asset(tmp_path/'glyph.png')
+    old=request_digest('asset','inline-0.10','',input_options(path,spelling='glyph.png'))
+    write_bundle(tmp_path,'vector',{old:r'\typeout{OLD-POLICY-WAS-USED}'})
+    output=compile_document(tmp_path,r'\Glyph{test}',r'\GlyphRegister{test}{glyph.png}',mode='preprocess',success=False)
+    assert 'XSR-RESPONSE-MISSING' in output and 'OLD-POLICY-WAS-USED' not in output

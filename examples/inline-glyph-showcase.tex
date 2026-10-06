@@ -88,8 +88,8 @@ $w=\alpha Cs\sqrt{r}$ and $h=\alpha Cs/\sqrt{r}$.
 \newpage
 \PageTitle{3. Size, center alignment and two adjustments}
 A cached glyph follows the active font size at each use. Image glyphs align
-their geometric center to the current ideographic cell center. A user raise
-is an additional displacement after that automatic placement.
+their geometric center to the current ideographic cell center, followed by a
+small downward optical correction. User raise is an additional displacement.
 
 {\small Small text: before \Glyph{square} and \Glyph{tall} after.\par}
 Normal text: before \Glyph{square} and \Glyph{tall} after.\par
@@ -111,8 +111,8 @@ Lowered \Glyph[raise=-2pt]{square}
 \Glyph[scale=1.5,raise=2pt]{square}
 \end{verbatim}
 
-Scale multiplies both dimensions by the same factor. Raise changes height and
-depth honestly. Width, height, xscale, yscale, stretch and crop are not public
+Scale multiplies both dimensions and the policy correction by the same factor.
+Raise changes height and depth honestly. Width, height, xscale, yscale, stretch and crop are not public
 adjustments. There is no preserve-aspect switch: proportions are always kept.
 
 \textbf{Vector and image baseline behavior}
@@ -121,7 +121,8 @@ Vector \Glyph{vector}\quad Image \Glyph{square}\quad
 Vector \Glyph{vector}\quad Image \Glyph{square}
 
 Vectors use the cell baseline and normal side spacing. Images use center
-alignment, the slightly larger normalization and tighter side bearings.
+alignment plus a downward bias of $0.12$ times the scaled cell, slightly larger
+normalization and tighter side bearings.
 When no ideographic metrics exist in the current font, the reference is its
 em square, extending from the baseline to one em above it.
 \vfill
