@@ -1,0 +1,120 @@
+﻿\NeedsTeXFormat{LaTeX2e}
+\ProvidesExplPackage{xsr-inline}{2026-10-06}{0.10}{Common inline glyph metrics and label registry}
+\RequirePackage{xsr-core}
+\RequirePackage{pgf}
+\RequirePackage{graphicx}
+\ExplSyntaxOn
+\fp_new:N \l_xsr_inline_scale_fp
+\fp_set:Nn \l_xsr_inline_scale_fp {1}
+\dim_new:N \l_xsr_inline_raise_dim
+\dim_new:N \l_xsr_inline_cell_dim
+\dim_new:N \l_xsr_inline_center_dim
+\dim_new:N \l_xsr_inline_unit_dim
+\dim_new:N \l_xsr_inline_width_dim
+\dim_new:N \l_xsr_inline_height_dim
+\dim_new:N \l_xsr_inline_shift_dim
+\dim_new:N \l_xsr_inline_left_dim
+\dim_new:N \l_xsr_inline_right_dim
+\dim_new:N \l_xsr_inline_top_dim
+\dim_new:N \l_xsr_inline_bottom_dim
+\dim_new:N \l_xsr_inline_side_dim
+\tl_new:N \l_xsr_inline_path_tl
+\prop_new:N \g_xsr_glyph_files_prop
+\msg_new:nnn{xsr-inline}{unknown}{[XSR-GLYPH-UNKNOWN]~Unregistered~glyph~label:~#1.}
+\msg_new:nnn{xsr-inline}{duplicate}{[XSR-GLYPH-DUPLICATE]~Label~already~registered~to~another~file:~#1.}
+\msg_new:nnn{xsr-inline}{label}{[XSR-GLYPH-LABEL]~Use~a~nonempty~literal~label.}
+\msg_new:nnn{xsr-inline}{geometry}{[XSR-INLINE-GEOMETRY]~Scale~must~be~a~finite~positive~number.}
+\msg_new:nnn{xsr-inline}{missing}{[XSR-ASSET-MISSING]~Registered~asset~file~is~missing.}
+\msg_new:nnn{xsr-inline}{stale}{[XSR-STALE]~Glyph~asset~changed;~regenerate~the~response.}
+\keys_define:nn{xsr/inline}
+  {scale .code:n = {
+    \regex_match:nnF{\A[+]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?\Z}{#1}
+      {\msg_fatal:nn{xsr-inline}{geometry}}
+    \fp_set:Nn\l_xsr_inline_scale_fp{#1}
+    \fp_compare:nF{0 < \l_xsr_inline_scale_fp < inf}{\msg_fatal:nn{xsr-inline}{geometry}}},
+   raise .dim_set:N = \l_xsr_inline_raise_dim}
+% Internal host seam: an ideographic advance and its baseline-relative center.
+% Prefer current-font U+3000 advance and U+56FD center. With no ideographs,
+% use the current em square, height C and depth zero. No arbitrary fixed raise.
+\cs_new_protected:Npn\xsr_inline_cell_metrics:
+  {\dim_set:Nn\l_xsr_inline_cell_dim{\fontdimen6\font}
+   \iffontchar\font"3000
+     \dim_compare:nNnT{\fontcharwd\font"3000}>{0pt}
+       {\dim_set:Nn\l_xsr_inline_cell_dim{\fontcharwd\font"3000}}
+   \fi
+   \dim_compare:nNnF{\l_xsr_inline_cell_dim}>{0pt}
+     {\dim_set:Nn\l_xsr_inline_cell_dim{\f@size pt}}
+   \dim_set:Nn\l_xsr_inline_center_dim{.5\l_xsr_inline_cell_dim}
+   \iffontchar\font"56FD
+     \dim_set:Nn\l_xsr_inline_center_dim{(\fontcharht\font"56FD-\fontchardp\font"56FD)/2}
+   \fi}
+\NewDocumentCommand\xsrInlineGlyph{m m m m m m m m m}
+  {\group_begin:
+   \xsr_inline_cell_metrics:
+   \dim_set:Nn\l_xsr_inline_unit_dim{\fp_use:N\l_xsr_inline_scale_fp\l_xsr_inline_cell_dim}
+   \dim_set:Nn\l_xsr_inline_width_dim{#2\l_xsr_inline_unit_dim}
+   \dim_set:Nn\l_xsr_inline_height_dim{#3\l_xsr_inline_unit_dim}
+   \dim_set:Nn\l_xsr_inline_shift_dim{\l_xsr_inline_center_dim-.5\l_xsr_inline_cell_dim+\l_xsr_inline_raise_dim}
+   \str_if_eq:nnT{#1}{center}
+     {\dim_set:Nn\l_xsr_inline_shift_dim{\l_xsr_inline_center_dim-.5\l_xsr_inline_height_dim+\l_xsr_inline_raise_dim}}
+   \dim_set:Nn\l_xsr_inline_left_dim{#4\l_xsr_inline_unit_dim}
+   \dim_set:Nn\l_xsr_inline_right_dim{#6\l_xsr_inline_unit_dim}
+   \dim_set:Nn\l_xsr_inline_bottom_dim{#5\l_xsr_inline_unit_dim+\l_xsr_inline_shift_dim}
+   \dim_set:Nn\l_xsr_inline_top_dim{#7\l_xsr_inline_unit_dim+\l_xsr_inline_shift_dim}
+   \dim_compare:nNnT{\l_xsr_inline_bottom_dim}>{0pt}{\dim_zero:N\l_xsr_inline_bottom_dim}
+   \dim_compare:nNnT{\l_xsr_inline_top_dim}<{0pt}{\dim_zero:N\l_xsr_inline_top_dim}
+   \dim_set:Nn\l_xsr_inline_side_dim{#8\l_xsr_inline_width_dim}
+   \dim_set_eq:NN\l_xsr_vector_em_dim\l_xsr_inline_height_dim
+   \iow_term:x{XSR-INLINE~alignment=#1~canvas-width=\dim_use:N\l_xsr_inline_width_dim
+     ~canvas-height=\dim_use:N\l_xsr_inline_height_dim
+     ~advance=\dim_eval:n{\l_xsr_inline_right_dim-\l_xsr_inline_left_dim+2\l_xsr_inline_side_dim}
+     ~height=\dim_use:N\l_xsr_inline_top_dim~depth=\dim_eval:n{-\l_xsr_inline_bottom_dim}}
+   \mode_leave_vertical:
+   \hbox{\kern\l_xsr_inline_side_dim
+    \pgfpicture
+     \pgfsetbaseline{0pt}
+     \pgfpathrectangle{\pgfpoint{\l_xsr_inline_left_dim}{\l_xsr_inline_bottom_dim}}
+       {\pgfpoint{\dim_eval:n{\l_xsr_inline_right_dim-\l_xsr_inline_left_dim}}
+        {\dim_eval:n{\l_xsr_inline_top_dim-\l_xsr_inline_bottom_dim}}}
+     \pgfusepath{use~as~bounding~box}
+     \pgfinterruptboundingbox
+      \pgftransformshift{\pgfpoint{0pt}{\l_xsr_inline_shift_dim}}#9
+     \endpgfinterruptboundingbox
+    \endpgfpicture\kern\l_xsr_inline_side_dim}
+   \group_end:}
+\NewDocumentCommand\xsrInlineImage{m m m}
+  {\tl_clear:N\l_xsr_inline_path_tl
+   \clist_map_inline:nn{#1}{\tl_put_right:Nx\l_xsr_inline_path_tl{\char_generate:nn{\int_from_hex:n{##1}}{12}}}
+   \str_if_eq:eeF{\file_mdfive_hash:V\l_xsr_inline_path_tl}{#2}{\msg_fatal:nn{xsr-inline}{stale}}
+   % Both computed dimensions come from the same uniform canvas scale. This
+   % ignores non-square DPI metadata; no user width/height controls are exposed.
+   \pgftext[left,base]{\str_if_eq:nnTF{#3}{pdf}
+    {\includegraphics[page=1,pagebox=mediabox,width=\l_xsr_inline_width_dim,height=\l_xsr_inline_height_dim]{\l_xsr_inline_path_tl}}
+    {\includegraphics[width=\l_xsr_inline_width_dim,height=\l_xsr_inline_height_dim]{\l_xsr_inline_path_tl}}}}
+\NewDocumentCommand\GlyphRegister{m m}
+  {\xsr_vector_literal:n{#1}\xsr_vector_literal:n{#2}
+   \tl_if_blank:nT{#1}{\msg_fatal:nn{xsr-inline}{label}}
+   \tl_set:Nx\l_tmpa_tl{\tl_to_str:n{#1}}
+   \prop_get:NVNTF\g_xsr_glyph_files_prop\l_tmpa_tl\l_tmpb_tl
+    {\str_if_eq:VnF\l_tmpb_tl{#2}{\msg_fatal:nnn{xsr-inline}{duplicate}{#1}}}
+    {\prop_gput:NVn\g_xsr_glyph_files_prop\l_tmpa_tl{#2}}}
+\NewDocumentCommand\Glyph{O{} m}
+  {\group_begin:
+   \fp_set:Nn\l_xsr_inline_scale_fp{1}\dim_zero:N\l_xsr_inline_raise_dim
+   \keys_set:nn{xsr/inline}{#1}
+   \tl_set:Nx\l_tmpa_tl{\tl_to_str:n{#2}}
+   \prop_get:NVNTF\g_xsr_glyph_files_prop\l_tmpa_tl\l_tmpb_tl
+    {\exp_args:NV\xsr_inline_asset:n\l_tmpb_tl}
+    {\msg_fatal:nnn{xsr-inline}{unknown}{#2}}
+   \group_end:}
+\cs_new_protected:Npn\xsr_inline_asset:n #1
+  {\xsr_vector_literal:n{#1}\xsr_vector_encode:n{#1}
+   \tl_set:Nn\l_xsr_vector_path_tl{#1}
+   \tl_set:Nx\l_xsr_vector_digest_tl{\file_mdfive_hash:V\l_xsr_vector_path_tl}
+   \tl_if_empty:NT\l_xsr_vector_digest_tl{\msg_fatal:nn{xsr-inline}{missing}}
+   \tl_set:Nx\g_xsr_renderer_options_tl
+    {\c_left_brace_str"source_codepoints":"\l_xsr_vector_codes_tl","source_digest":"\l_xsr_vector_digest_tl"\c_right_brace_str}
+   \xsr_vector_request:nn{asset}{}}
+\xsr_register_backend:nnn{asset}{inline-0.10}{xsr_vector_request:nn}
+\ExplSyntaxOff
+\endinput

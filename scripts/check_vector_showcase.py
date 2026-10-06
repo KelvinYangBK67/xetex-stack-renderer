@@ -10,7 +10,7 @@ def main():
     with fitz.open(args.pdf) as pdf:
         assert len(pdf) == 3
         for index, page in enumerate(pdf):
-            assert 'XSR 0.9' in page.get_text(), index
+            assert 'XSR 0.10' in page.get_text(), index
             assert len(page.get_drawings()) >= 3, index
             assert not page.get_images(), 'raster image in vector showcase'
             pix = page.get_pixmap()

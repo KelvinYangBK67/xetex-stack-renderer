@@ -89,10 +89,11 @@ def preprocess(args):
     from .policy_scopes import policy_spans
     policies = policy_spans(sources)
     runs, emitted = [], set()
-    from .vector_preprocess import COMMAND as vector_command
+    from .vector_preprocess import COMMAND as vector_command, INLINE_COMMAND as inline_command
     for path, (raw, source) in sources.items():
         # External identifiers and asset paths are data, not font-backed text.
         script_source = vector_command.sub(lambda match: ' ' * len(match.group()), source)
+        script_source = inline_command.sub(lambda match: ' ' * len(match.group()), script_source)
         for run in source_runs(script_source, registry):
             if not profiles[run.script]:
                 raise XSRError('XSR-FONT-NOT-SELECTED',

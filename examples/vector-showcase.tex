@@ -6,7 +6,7 @@
 \definecolor{accent}{HTML}{267B82}
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{9pt}
-\newcommand\PageTitle[1]{{\color{ink}\LARGE\bfseries XSR 0.9 / External vectors}\par
+\newcommand\PageTitle[1]{{\color{ink}\LARGE\bfseries XSR 0.10 / External vectors}\par
   {\color{accent}\large #1}\par\medskip\hrule\medskip}
 \newcommand\Sample[2]{\par\medskip\textbf{#1}\par\medskip {\fontsize{30}{40}\selectfont #2}\par\medskip}
 \input{vector-showcase-config}
@@ -27,7 +27,7 @@ Before \xsrVectorGlyph{square.svg} after. Before \xsrVectorGlyph{sparse.svg} aft
 \par\medskip
 The bottom of the default square is on the text baseline. The box has height
 1em and depth zero. A rectangular viewBox preserves its aspect ratio, using
-one design-space height per em.
+geometric-mean normalization: $\sqrt{wh}=1$em.
 \vfill
 \small Direct API: \texttt{\string\xsrVectorGlyph\{path/to/glyph.svg\}}.
 Paths resolve from the XeLaTeX working directory. Source content joins the cache identity.

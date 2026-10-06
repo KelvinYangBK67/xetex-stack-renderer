@@ -50,3 +50,18 @@ def test_active_cycle_still_rejected(tmp_path):
     a.write_text(r'\input{b}');b.write_text(r'\input{a}')
     with pytest.raises(XSRError,match='cyclic'):
         discover_sources([a])
+
+
+
+def test_font_run_included_under_each_policy(tmp_path):
+    from test_font_metrics import make_font
+    font=tmp_path/'font.ttf';make_font(font)
+    source=tmp_path/'main.tex'
+    source.write_text(r'\xsrEgyptianDefaultFont{font.ttf}'
+        r'{\xsrMissingGlyphPolicy{error}\input{child}}'
+        r'{\xsrMissingGlyphPolicy{box}\input{child}}')
+    (tmp_path/'child.tex').write_text(chr(0x13000),encoding='utf-8')
+    main(['preprocess','--input',str(source),'--output-dir',str(tmp_path)])
+    runs=json.loads((tmp_path/'main.xsr-manifest.json').read_text())['runs']
+    assert {r['options'].get('missing_glyph_policy','box') for r in runs}=={'box','error'}
+    assert len({r['response'] for r in runs})==2

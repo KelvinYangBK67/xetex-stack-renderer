@@ -1,0 +1,164 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=24mm]{geometry}
+\usepackage{xcolor}
+\usepackage[mode=preprocess]{xetex-stack-renderer}
+\definecolor{ink}{HTML}{18354B}
+\definecolor{accent}{HTML}{267B82}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{10pt}
+\newcommand\PageTitle[1]{{\color{ink}\LARGE\bfseries XSR 0.10 / Inline glyphs}\par
+ {\color{accent}\large #1}\par\medskip\hrule\medskip}
+\GlyphRegister{square}{square.png}
+\GlyphRegister{tall}{tall.png}
+\GlyphRegister{very-tall}{very-tall.png}
+\GlyphRegister{wide}{wide.png}
+\GlyphRegister{very-wide}{very-wide.png}
+\GlyphRegister{vector}{square.svg}
+\GlyphRegister{jpeg}{square.jpg}
+\GlyphRegister{pdf}{square.pdf}
+\begin{document}
+\PageTitle{1. Named signs in running text}
+An external sign is a text-sized visual glyph. A label points to an ordinary
+file, and each occurrence follows the size of the surrounding type.
+
+In this invented reading sample, a square sign \Glyph{square} separates two
+phrases. The same sign \Glyph{square} occurs later in the sentence, and again
+here \Glyph{square}. These are neutral stroke fixtures, not transcriptions of
+historical characters.
+
+\textbf{The complete public registration API}
+\begin{verbatim}
+\GlyphRegister{square}{square.png}
+Before \Glyph{square} after.
+\end{verbatim}
+
+\textbf{A common square canvas, four source formats}
+
+{\fontsize{26}{36}\selectfont
+PNG \Glyph{square}\quad JPEG \Glyph{jpeg}\par
+PDF \Glyph{pdf}\quad SVG \Glyph{vector}\par}
+
+The three image assets use the same policy, including PDF page inclusion.
+Their canvas is 1.10 times the local cell. SVG uses 1.00 and remains PGF paths;
+PNG and JPEG remain embedded raster images. All four preserve their canvas
+proportions and pass through the same inline layout model.
+
+\textbf{Canvas margins are part of the supplied sign}
+
+The original fixture leaves a small white border around its strokes. XSR keeps
+that border. Prepare a reasonably cropped source before registering it: XSR
+performs no background removal, thresholding, cropping, trimming or tracing.
+\vfill
+\small This four-page document is preprocessed once and compiled with
+\texttt{xelatex -no-shell-escape}. No font or external glyph dataset is bundled.
+\newpage
+\PageTitle{2. Rectangular signs retain their proportions}
+The geometric mean of the final width and height is tied to the current
+ideographic cell. A tall sign stays tall; a wide sign occupies more horizontal
+space. No dimension is clamped to 1em.
+
+\textbf{Aspect ratios are canvas width : canvas height}
+
+{\fontsize{24}{32}\selectfont
+1:1 \Glyph{square}\qquad 1:2 \Glyph{tall}\qquad 1:4 \Glyph{very-tall}\par
+\medskip
+2:1 \Glyph{wide}\qquad 4:1 \Glyph{very-wide}\par}
+
+\textbf{Natural line spacing in a paragraph}
+
+\begingroup\setlength{\parskip}{0pt}
+\noindent An ordinary first line establishes the normal text baseline.\\
+A second ordinary line follows at the normal baseline distance.\\
+This line contains a tall sign \Glyph{very-tall} within running text.\\
+The next line moves down to respect the sign's reported depth.\\
+Normal line spacing resumes after the tall sign has passed.\par
+\endgroup
+
+\textbf{Horizontal occupancy}
+
+Before \Glyph{square} after. Before \Glyph{wide} after.
+Before \Glyph{very-wide} after.
+
+The box reports the complete canvas height and depth. Image side bearings
+reduce advance by two percent of canvas width on each side, allowing a small,
+intentional overhang into the usual white margin. No pixels are clipped.
+\vfill
+\small For canvas ratio $r=W/H$, cell size $C$ and uniform scale $s$:
+$w=\alpha Cs\sqrt{r}$ and $h=\alpha Cs/\sqrt{r}$.
+\newpage
+\PageTitle{3. Size, center alignment and two adjustments}
+A cached glyph follows the active font size at each use. Image glyphs align
+their geometric center to the current ideographic cell center. A user raise
+is an additional displacement after that automatic placement.
+
+{\small Small text: before \Glyph{square} and \Glyph{tall} after.\par}
+Normal text: before \Glyph{square} and \Glyph{tall} after.\par
+{\Large Large text: before \Glyph{square} and \Glyph{tall} after.\par}
+
+\textbf{Uniform scale}
+
+Original \Glyph{square}\quad
+Smaller \Glyph[scale=.8]{square}\quad
+Larger \Glyph[scale=1.5]{square}
+
+\textbf{An additional vertical raise}
+
+Default \Glyph{square}\quad
+Raised \Glyph[raise=2pt]{square}\quad
+Lowered \Glyph[raise=-2pt]{square}
+
+\begin{verbatim}
+\Glyph[scale=1.5,raise=2pt]{square}
+\end{verbatim}
+
+Scale multiplies both dimensions by the same factor. Raise changes height and
+depth honestly. Width, height, xscale, yscale, stretch and crop are not public
+adjustments. There is no preserve-aspect switch: proportions are always kept.
+
+\textbf{Vector and image baseline behavior}
+
+Vector \Glyph{vector}\quad Image \Glyph{square}\quad
+Vector \Glyph{vector}\quad Image \Glyph{square}
+
+Vectors use the cell baseline and normal side spacing. Images use center
+alignment, the slightly larger normalization and tighter side bearings.
+When no ideographic metrics exist in the current font, the reference is its
+em square, extending from the baseline to one em above it.
+\vfill
+\small The same source response is reused across all sizes and adjustments on
+this page. Geometry is resolved before rendering; current type metrics remain local.
+\newpage
+\PageTitle{4. One layout pipeline, separate input paths}
+Manual assets, direct SVG and externally produced SVG all resolve to the same
+visual-asset model before sizing, alignment, spacing and TeX box construction.
+Provider configuration is separate from the two-argument label registry.
+
+\textbf{Registered SVG and direct SVG}
+
+{\fontsize{26}{36}\selectfont
+\Glyph{vector}\quad\xsrVectorGlyph{square.svg}\quad\Glyph{vector}\par}
+
+The first and third signs use a registered label. The middle sign uses the
+existing direct SVG API. Their layout policy and vector payload are identical.
+The existing provider API feeds this same stage after obtaining and validating
+an SVG file.
+
+\textbf{Repeated names across formats}
+
+A PNG sign \Glyph{square} can recur as \Glyph{square}, a JPEG sign
+\Glyph{jpeg} as \Glyph{jpeg}, and a PDF sign \Glyph{pdf} as \Glyph{pdf}.
+A repeated label must still refer to the same literal file. Unknown labels and
+conflicting registrations produce explicit errors.
+
+\textbf{The boundary of this release}
+
+XSR reads canvas metadata and places the original image or validated vector.
+This release does not implement image cleanup, an IDS engine, KAGE, a network
+glyph service, transcription metadata or PDF semantic text handling.
+
+The stroke fixtures are original drawings created by the showcase builder.
+The source files remain in the temporary build directory; only this showcase
+PDF and its reproducible source are committed.
+\vfill
+\small XSR 0.10 / Generic inline external glyphs / Four-page verification specimen
+\end{document}

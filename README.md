@@ -1,9 +1,10 @@
 # xetex-stack-renderer
 
-XSR **0.9** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
+XSR **0.10** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
 frontend dispatches complete script runs to registered backends. Egyptian
 Hieroglyphs and Khitan Small Script have independent font-backed backends.
-Direct SVG and optional external providers share a generic vector layer.
+Registered SVG/PNG/JPEG/PDF assets, direct SVG and optional external providers
+share one generic inline-glyph layout pipeline.
 KAGE is an optional external producer, never an XSR dependency.
 
 ## Install and use
@@ -40,7 +41,133 @@ contain `"`, `{`, `}`, `%`, `#`, `[` or `]`, NUL or line breaks. Font commands t
 literal paths, not macro expressions. Paths cross the TeX/Python boundary as
 Unicode codepoint lists rather than interpolated JSON strings.
 
-## External vector glyphs (0.9)
+## Generic inline glyphs (0.10)
+
+An inline glyph participates in running text; it is not a figure. Register a
+reasonably prepared file and use its label:
+
+```tex
+\documentclass{article}
+\usepackage{xetex-stack-renderer}
+\GlyphRegister{bs-042}{images/042.png}
+\GlyphRegister{sign-v}{assets/sign.svg}
+\begin{document}
+Before \Glyph{bs-042} after. Again \Glyph{bs-042}.
+Adjusted \Glyph[scale=1.2,raise=1pt]{sign-v}.
+\end{document}
+```
+
+Compile with `xelatex -shell-escape document.tex`, or prepare responses once:
+
+```console
+xsr-render preprocess --input document.tex --output-dir .
+xelatex -no-shell-escape document.tex
+```
+
+For the second workflow, use `\usepackage[mode=preprocess]{xetex-stack-renderer}`.
+Files must remain available during final compilation. Relative asset paths are
+relative to the XeLaTeX working directory (`--tex-workdir` in preprocessing,
+defaulting to `--output-dir`). Use literal forward-slash paths as for direct SVG.
+
+The registry is global and intentionally only **label -> file**. Registering
+the same label with the same literal file again is harmless; a conflicting
+registration fails with `XSR-GLYPH-DUPLICATE`. An unknown label fails with
+`XSR-GLYPH-UNKNOWN`. Formats are inferred from the extension and verified against
+the content. Aliases and provider configuration are not part of registration.
+
+### Canvas and sizing
+
+Supported inputs are restricted SVG, single-frame PNG, JPEG/JPG and single-page,
+unencrypted PDF. The canvas is authoritative: SVG uses its design space; raster
+images use pixel width/height (independent of DPI metadata); PDF uses its complete
+MediaBox with page rotation applied. A PDF remains an included PDF, including
+any original vector content. XSR does not convert raster images to SVG.
+
+Prepare sensible borders yourself. XSR performs **no image processing**: no
+cropping, trimming, thresholding, background removal, ink-bound analysis, OCR,
+cleanup or tracing. Original image/PDF files are included without rewriting.
+
+For intrinsic canvas `W x H`, current ideographic-cell size `C`, and uniform
+use-site scale `s`, geometric-mean normalization gives:
+
+```text
+r = W / H
+w = alpha * C * s * sqrt(r)
+h = alpha * C * s / sqrt(r)
+sqrt(w*h) = alpha * C * s
+```
+
+The policy defaults are centralized in `xsr.inline`: vector `alpha=1.00`, image
+`alpha=1.10` (including PDF). The image increment accommodates common small
+canvas margins. **No maximum width or height is imposed.** Tall glyphs can
+expand line spacing and wide glyphs occupy additional horizontal space.
+Ratios above 16:1 or below 1:16 produce `XSR-INLINE-ASPECT`, without reshaping.
+
+The current font's positive U+3000 advance supplies `C` when available;
+otherwise its em is used. U+56FD's height/depth supplies the ideographic center
+when available; otherwise the reference is an em square above the baseline,
+centered at `C/2`. Hosts can replace the internal cell-metrics hook. There is
+no dependence on an Egyptian/Khitan font selected for a different backend.
+
+Images align their full canvas center to that cell center: `shift=center-h/2`.
+Vectors start at the reference cell baseline. User `raise` is then added.
+Height and depth include the resulting extents; vector ink extending beyond its
+viewBox also enlarges its reported box, without changing the normalization.
+
+Vector side bearings are zero. Images use an explicit side bearing of `-0.02*w`
+on each side, so their advance is `0.96*w`; their full canvas width remains `w`.
+This small intentional overhang tightens adjacent text spacing without cropping,
+clipping, reducing height/depth or hiding an oversized glyph in a fake 1em box.
+The distinction lives in the shared policy layer.
+
+Only **uniform positive finite `scale` and TeX-length `raise`** are public
+adjustments. Independent width/height, xscale/yscale, stretch, crop/trim and an
+aspect-preservation switch are unsupported. Font size, scale and raise are
+resolved at each TeX use, so repeated occurrences share a source response even
+at different sizes. Source-content changes invalidate the cached identity.
+
+### Shared pipeline and Python primitives
+
+Manual files, direct SVG and provider-produced SVG converge at `VisualAsset`
+before `layout_inline` builds an immutable `InlineGlyph`. It carries canvas
+size, full width, advance, height/depth, shift, bounds, payload and cache identity.
+`inline_tex` serializes the common model; `xsr-inline.sty` resolves the current
+font cell and use-site adjustments and constructs the actual TeX box.
+
+```python
+from math import isclose
+from xsr.inline import GlyphRegistry, IdeographicCell, layout_inline, inline_tex
+
+registry = GlyphRegistry(base_dir="assets")
+registry.register("sample", "sample.png")
+asset = registry.resolve("sample")
+glyph = layout_inline(asset, IdeographicCell(size=10, center=4),
+                      scale=1.2, raise_by=1)
+assert isclose(glyph.canvas_width / glyph.canvas_height, asset.aspect_ratio)
+tex_response = inline_tex(asset)  # current TeX font/adjustments resolved at use
+```
+
+`resolve_asset(path)` also accepts an externally acquired file;
+`vector_asset(import_svg(svg_data))` adapts validated in-memory SVG geometry.
+Existing provider commands remain a separate front end: users are not forced
+to register generated results or place provider settings in `\GlyphRegister`.
+Provider invocation and restricted SVG safety rules are unchanged.
+
+Preprocessing executes **every literal include occurrence** under its active
+brace-scoped provider/style/missing-policy state. Only the active recursion
+stack detects cycles. Include lookup prefers the current parent directory,
+then explicit entrypoint directories in order; previously visited directories
+do not change lookup. Literal traversal is not a general TeX interpreter.
+
+0.10 adds no KAGE implementation, Bai-style IDS, zi.tools or GlyphWiki
+integration, IDS-to-geometry, Han-to-IDS lookup, network glyph fetching, IMPE
+integration, logical/transcription metadata, ActualText, accessibility/index
+semantics or PDF copy/paste handling. Identity metadata exists only for XSR's
+cache. See the [four-page inline showcase](examples/inline-glyph-showcase.pdf),
+its [source](examples/inline-glyph-showcase.tex), and
+[release verification](docs/v0.10-verification.md).
+
+## External vector glyphs and providers
 
 The three layers are deliberately separate:
 
@@ -66,13 +193,15 @@ Paths must not contain TeX reserved characters, backslashes, NUL or line breaks;
 use plain filenames rather than macro expansions or TeX escaping.
 
 The SVG design space is its `viewBox`, or numeric `width` and `height` if no
-viewBox exists. One design-space height maps to 1em; aspect ratio is preserved.
-A 200 x 200 asset has advance 1em, height 1em, depth zero and a bottom baseline.
+viewBox exists. The common inline pipeline uses geometric-mean normalization
+with vector alpha 1.00 and preserves aspect ratio. With an em-square reference,
+a 200 x 200 asset has advance 1em, height 1em, depth zero and a bottom baseline.
 Ink bounds never rescale a glyph. The SVG y axis is inverted into TeX's y-up
 geometry. These are glyph metrics, not browser viewport layout: when viewBox
 exists it defines the design space independently of the physical viewport size.
 Outlines are not clipped to the design cell. Glyph objects retain design size,
-normalized advance/height/depth, bounds, commands and affine transforms, not XML.
+normalized source geometry, bounds, commands and affine transforms, not XML.
+The shared InlineGlyph layer supplies final advance/height/depth.
 
 Output is PGF path geometry in PDF. There is no rasterization, Inkscape,
 LaTeX `svg` package, intermediate image/PDF or invented Unicode/PUA mapping.
@@ -194,7 +323,7 @@ responses can still be reused within the TeX document. Change the configuration
 metadata revision or remove the provider cache when the engine/dataset changes.
 The provider cannot reveal changes to its environment unless its configured
 identity changes. The `obtain_many` abstraction leaves future batch invocation
-open; 0.9 invokes one process per unique uncached request.
+open; 0.10 invokes one process per unique uncached request.
 
 ### Missing-glyph policy
 
@@ -281,7 +410,7 @@ ad6d20d17e7b0af746106b8e0e3ac65c47f6813a4acb6e05786023e1374a953f.
 No font binary is committed. The optional Linear font file used for the
 committed comparison page has SHA-256
 E5DEA2755975D4BAAFA3DAF5E6A695C1338F3298B3836B07EE39FD1E61B7BC95.
-The official Noto v1.000 font lacks U+18CFF. XSR 0.9 renders a synthetic
+The official Noto v1.000 font lacks U+18CFF. XSR 0.10 renders a synthetic
 1em hollow box in its normal KSS slot and logs `XSR-GLYPH-MISSING`.
 The strict `error` policy raises instead; a font with an outline uses that outline.
 
@@ -490,7 +619,7 @@ macro bodies can still contribute runs. Regenerate after changing sources or fon
 | `XSR-PARSE` | Invalid or parser-unsupported syntax; includes codepoints |
 | `XSR-UNSUPPORTED` | Recognized feature not implemented |
 | `XSR-INSERTION-NO-SPACE` | No safe region at the supported minimum scale |
-| `XSR-STALE` | Font content changed; regenerate preprocessed output |
+| `XSR-STALE` | Font or external asset content changed; regenerate preprocessed output |
 | `XSR-INVOCATION` | Python renderer failed to produce a response |
 | `XSR-REQUEST`, `XSR-RESPONSE` | Malformed protocol input/output |
 | `XSR-PREPROCESS`, `XSR-SOURCE-MISSING` | Source discovery failed |
@@ -506,17 +635,19 @@ python scripts/fetch_noto.py
 python scripts/fetch_newgardiner.py
 python scripts/fetch_khitan.py
 python -m pytest
-python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py tests/test_vector_tex.py
+python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py tests/test_vector_tex.py tests/test_inline_tex.py
 python scripts/build_showcase.py --font tmp/fonts/NotoSansEgyptianHieroglyphs-Regular.ttf --font tmp/fonts/NewGardiner.ttf --font C:/Windows/Fonts/seguihis.ttf
 python scripts/check_showcase.py examples/egyptian-showcase.pdf
 python scripts/build_khitan_showcase.py --font tmp/fonts/NotoSerifKhitanSmallScript-Regular.ttf --comparison-font D:/_INBOX/Download/KhitanSmallLinear.ttf
 python scripts/check_khitan_showcase.py examples/khitan-showcase.pdf
 python scripts/build_vector_showcase.py
 python scripts/check_vector_showcase.py examples/vector-showcase.pdf
+python scripts/build_inline_showcase.py
+python scripts/check_inline_showcase.py examples/inline-glyph-showcase.pdf
 ```
 
 The builder accepts two or three fonts and compiles in a fresh temporary directory
-without shell escape. The committed [six-page 0.9 showcase](examples/egyptian-showcase.pdf)
+without shell escape. The committed [six-page 0.10 showcase](examples/egyptian-showcase.pdf)
 and [editable source](examples/egyptian-showcase.tex) compare Noto, NewGardiner and
 Segoe UI Historic across basic layout, all seven insertion slots, overlay,
 enclosures, registered transforms, RTL, editorial brackets, continuous shading,
@@ -526,7 +657,7 @@ paragraph wrapping and combinations. The older
 [GitHub Actions](.github/workflows/ci.yml) installs the package on Ubuntu 24.04 with
 Python 3.11, focused TeX Live packages and Poppler; downloads checksum-verified Noto Egyptian, NewGardiner and Noto Khitan
 from their official repositories at runtime; verifies Hieropy is absent, runs
-all tests plus separate XeLaTeX integration, and rebuilds all three current showcases. Test reports, PDF and page images are artifacts, never automatic
+all tests plus separate XeLaTeX integration, and rebuilds all four current showcases. Test reports, PDF and page images are artifacts, never automatic
 commits. NewGardiner is fetched from its pinned official upstream revision; Segoe is
 optional on Windows. No external fonts are vendored. Noto can also be selected with `XSR_NOTO_FONT`; additional test
 fonts use `XSR_TEST_FONTS` (an `os.pathsep`-separated list).
@@ -563,8 +694,12 @@ The [0.5 verification](docs/v0.5-verification.md) and
 ## Dependencies and licenses
 
 XSR source is [MIT licensed](LICENSE). Its direct runtime dependencies are
-[fontTools](https://github.com/fonttools/fonttools) (MIT) for outline geometry
-and [Pillow](https://github.com/python-pillow/Pillow) (MIT-CMU) for ink masks.
+[fontTools](https://github.com/fonttools/fonttools) (MIT) for outline geometry,
+[Pillow](https://github.com/python-pillow/Pillow) (MIT-CMU) for existing font ink
+masks and image header metadata, and
+[pypdf](https://github.com/py-pdf/pypdf/blob/main/LICENSE) (BSD-3-Clause) for PDF
+page metadata. pypdf is a pure-Python reader; inline assets use metadata only,
+without a PDF rendering dependency or image-processing pass.
 Hieropy is not a runtime or test dependency. Generated Unicode semantics retain
 the [Unicode data license](src/xsr/egyptian/unicode-LICENSE.txt) in the wheel.
 Noto Sans Egyptian Hieroglyphs (SIL OFL 1.1) and NewGardiner (SIL OFL 1.1)

@@ -12,7 +12,7 @@ def main():
         assert len(pdf)==6, f'expected six pages, found {len(pdf)}'
         fonts=set()
         for index,page in enumerate(pdf):
-            assert 'XSR 0.9' in page.get_text(),f'missing heading on page {index+1}'
+            assert 'XSR 0.10' in page.get_text(),f'missing heading on page {index+1}'
             for xref,ext,typ,name,*_ in page.get_fonts():
                 if ext=='ttf':
                     fonts.add(name)

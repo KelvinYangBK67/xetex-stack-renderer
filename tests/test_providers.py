@@ -45,7 +45,7 @@ def test_provider_errors_and_fallback(tmp_path, glyph, code):
     with pytest.warns(XSRWarning, match='XSR-PROVIDER-'+code):
         result = renderer.render('provider', glyph, options)
     assert r'\xsrVectorWarning{XSR-PROVIDER-'+code+'}' in result
-    assert r'\xsrVectorBox{1}{1}{0}' in result
+    assert r'\xsrInlineGlyph{baseline}{1}{1}{0}{0}{1}{1}{0}' in result
 
 
 def test_unavailable(tmp_path):

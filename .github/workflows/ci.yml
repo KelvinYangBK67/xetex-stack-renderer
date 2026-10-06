@@ -45,7 +45,7 @@ jobs:
       - name: Verify Python, geometry, fonts and XeLaTeX
         run: python -m pytest -ra --junitxml=tmp/test-results.xml
       - name: Verify XeLaTeX integration separately
-        run: python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py tests/test_vector_tex.py -q
+        run: python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py tests/test_vector_tex.py tests/test_inline_tex.py -q
       - name: Rebuild visual showcase without shell escape
         shell: bash
         run: |
@@ -63,13 +63,18 @@ jobs:
           python scripts/build_vector_showcase.py --output tmp/ci-vector-showcase.pdf
           python scripts/check_vector_showcase.py tmp/ci-vector-showcase.pdf
           pdftoppm -scale-to 1400 -png tmp/ci-vector-showcase.pdf tmp/ci-vector-showcase
+      - name: Rebuild generic inline-glyph showcase
+        run: |
+          python scripts/build_inline_showcase.py --output tmp/ci-inline-glyph-showcase.pdf
+          python scripts/check_inline_showcase.py tmp/ci-inline-glyph-showcase.pdf
+          pdftoppm -scale-to 1400 -png tmp/ci-inline-glyph-showcase.pdf tmp/ci-inline-glyph-showcase
       - name: Verify package and external-engine boundaries
         run: python scripts/check_boundaries.py
       - name: Build and install a clean wheel
         run: |
           python -m pip wheel . --no-deps --wheel-dir tmp/wheels
           python -m venv tmp/wheel-env
-          tmp/wheel-env/bin/python -m pip install tmp/wheels/xetex_stack_renderer-0.9-*.whl
+          tmp/wheel-env/bin/python -m pip install tmp/wheels/xetex_stack_renderer-0.10-*.whl
           tmp/wheel-env/bin/python scripts/verify_install.py "$PWD"
       - name: Verify no external font binary is tracked
         shell: bash
@@ -94,4 +99,7 @@ jobs:
             tmp/ci-vector-showcase.pdf
             tmp/ci-vector-showcase-*.png
             tmp/pdfs/vector-showcase-build.log
+            tmp/ci-inline-glyph-showcase.pdf
+            tmp/ci-inline-glyph-showcase-*.png
+            tmp/pdfs/inline-glyph-showcase-build.log
           if-no-files-found: warn

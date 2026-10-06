@@ -139,6 +139,7 @@ def default_renderer(cache_dir: str | Path | None = None) -> Renderer:
     renderer.register(KhitanBackend())
     from .vector_backend import VectorBackend
     renderer.register(VectorBackend('vector', cache_dir or '.xsr-cache'))
+    renderer.register(VectorBackend('asset', cache_dir or '.xsr-cache'))
     renderer.register(VectorBackend('provider', cache_dir or '.xsr-cache'))
     return renderer
 

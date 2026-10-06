@@ -271,5 +271,5 @@ def paths_tex(glyph):
 
 
 def glyph_tex(glyph):
-    return r'\xsrVectorBox' + ''.join('{' + number(v) + '}' for v in
-                                      (glyph.advance, glyph.height, glyph.depth)) + '{' + paths_tex(glyph) + '}'
+    from .inline import inline_tex, vector_asset
+    return inline_tex(vector_asset(glyph))

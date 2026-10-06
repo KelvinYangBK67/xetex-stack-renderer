@@ -1,5 +1,5 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesExplPackage{xsr-vector}{2026-10-06}{0.9}{External vector glyphs and synthetic geometry}
+\ProvidesExplPackage{xsr-vector}{2026-10-06}{0.10}{External vector glyphs and synthetic geometry}
 \RequirePackage{xsr-core}
 \RequirePackage{pgf}
 \ExplSyntaxOn
@@ -98,7 +98,8 @@
     \exp_args:Nnx\xsr_vector_request:nn{provider}{\tl_to_str:n{#1}}
    \group_end:}
 \NewDocumentCommand \xsrKageGlyph {m}{\xsrProviderGlyph{#1}}
-\xsr_register_backend:nnn{vector}{vector-0.9}{xsr_vector_request:nn}
-\xsr_register_backend:nnn{provider}{vector-0.9}{xsr_vector_request:nn}
+\xsr_register_backend:nnn{vector}{inline-0.10}{xsr_vector_request:nn}
+\xsr_register_backend:nnn{provider}{inline-0.10}{xsr_vector_request:nn}
+\RequirePackage{xsr-inline}
 \ExplSyntaxOff
 \endinput
