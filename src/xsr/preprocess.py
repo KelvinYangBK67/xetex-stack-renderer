@@ -44,8 +44,9 @@ def discover_sources(inputs):
 
 
 def preprocess(args):
-    from .renderer import default_renderer, request_digest, response_filename, write_tex
+    from .renderer import default_renderer, request_digest
     from .source import source_runs
+    from .bundle import bundle_path, write_bundle, atomic_text
 
     inputs = args.input if isinstance(args.input, list) else [args.input]
     sources = discover_sources(inputs)
@@ -53,7 +54,8 @@ def preprocess(args):
     output_dir.mkdir(parents=True, exist_ok=True)
     workdir = (args.tex_workdir or output_dir).resolve()
     jobname = args.jobname or inputs[0].stem
-    renderer = default_renderer(args.cache_dir or output_dir / '.xsr-cache')
+    renderer = default_renderer(args.cache_dir)
+    bundle = bundle_path(jobname).as_posix()
     registry = build_default_registry()
     selections = {spec.name: {} for spec in registry.scripts}
     explicit = args.font or []
@@ -88,7 +90,7 @@ def preprocess(args):
                                     for extra in extras)
     from .policy_scopes import policy_spans
     policies = policy_spans(sources)
-    runs, emitted = [], set()
+    runs, responses = [], {}
     from .vector_preprocess import COMMAND as vector_command, INLINE_COMMAND as inline_command
     for path, (raw, source) in sources.items():
         # External identifiers and asset paths are data, not font-backed text.
@@ -106,22 +108,20 @@ def preprocess(args):
                         for extra in ([{'missing_glyph_policy': value}] if value == 'error' else [{}])]
             for options, render_options in variants:
                 digest = request_digest(run.script, version, run.text, options)
-                filename = response_filename(jobname, run.script, version, run.text, options)
-                if digest not in emitted:
-                    write_tex(output_dir / filename,
-                              renderer.render(run.script, run.text, render_options))
-                    emitted.add(digest)
+                if digest not in responses:
+                    responses[digest] = renderer.render(run.script, run.text, render_options)
                 runs.append(dict(number=len(runs)+1, digest=digest, script=run.script,
                                  backend_version=version, options=options, source=str(path),
                                  start=run.start, end=run.end,
                                  codepoints=[f'{ord(ch):X}' for ch in run.text],
-                                 response=filename))
+                                 response=bundle))
     from .vector_preprocess import prepare_vectors
-    runs.extend(prepare_vectors(sources, workdir, output_dir, jobname, renderer))
-    manifest = dict(format='XSR-PREPROCESS-2', source=str(inputs[0]),
+    runs.extend(prepare_vectors(sources, workdir, bundle, renderer, responses))
+    manifest = dict(format='XSR-PREPROCESS-3', bundle=bundle, source=str(inputs[0]),
                     source_sha256=hashlib.sha256(sources[inputs[0].resolve()][0].encode('utf-8')).hexdigest(),
                     sources=[dict(path=str(p), sha256=hashlib.sha256(raw.encode('utf-8')).hexdigest())
                              for p, (raw, _) in sources.items()], runs=runs)
-    (output_dir / f'{jobname}.xsr-manifest.json').write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
+    write_bundle(output_dir, jobname, responses)
+    atomic_text(output_dir / '.xsr' / f'{jobname}.manifest.json',
+                json.dumps(manifest, ensure_ascii=False, indent=2)+'\n')
     return 0

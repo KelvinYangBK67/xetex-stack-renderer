@@ -22,10 +22,11 @@ def input_options(path, *, spelling=None, provider=False):
 class VectorBackend:
     version = INLINE_VERSION
 
-    def __init__(self, name='vector', cache_dir='.xsr-cache'):
+    def __init__(self, name='vector', cache_dir=None):
         self.name = name
         self.cache_dir = cache_dir
         self._glyphs = {}
+        self._providers = {}
 
     def prepare_request(self, text, options):
         options = dict(options)
@@ -65,7 +66,11 @@ class VectorBackend:
                     raise XSRError('XSR-PROVIDER-UNAVAILABLE', 'no provider configuration selected')
                 config = ProviderConfig.read(path)
                 options['provider_identity'] = config.identity()
-                data = ExternalProvider(config, self.cache_dir).obtain(text, style)
+                from .renderer import canonical_options
+                provider_key = canonical_options(config.identity())
+                if provider_key not in self._providers:
+                    self._providers[provider_key] = ExternalProvider(config, self.cache_dir)
+                data = self._providers[provider_key].obtain(text, style)
                 asset = vector_asset(import_svg(data), (str(path), hashlib.sha256(data).hexdigest()))
             except XSRError as error:
                 if missing_policy == 'error' or error.code not in {

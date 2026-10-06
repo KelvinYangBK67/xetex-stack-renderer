@@ -33,6 +33,7 @@ def run_xelatex(
     body: str,
     preamble: str = '',
     packages: str = r'\usepackage{xetex-stack-renderer}',
+    prepare: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     if not preamble:
         preamble = reference_font_preamble()
@@ -46,13 +47,16 @@ def run_xelatex(
         '\\end{document}\n',
         encoding='utf-8',
     )
+    if prepare:
+        from xsr.renderer import main
+        main(['preprocess','--input',str(source),'--output-dir',str(tmp_path)])
     env = os.environ.copy()
     env['TEXINPUTS'] = str(ROOT / 'tex') + os.pathsep + env.get('TEXINPUTS', '')
     env['PYTHONPATH'] = str(ROOT / 'src') + os.pathsep + env.get('PYTHONPATH', '')
     return subprocess.run(
         [
             'xelatex',
-            '-shell-escape',
+            '-no-shell-escape' if prepare else '-shell-escape',
             '-interaction=nonstopmode',
             '-halt-on-error',
             source.name,
@@ -176,7 +180,8 @@ def test_multiple_egyptian_runs_dispatch_separately(tmp_path: Path) -> None:
     assert completed.returncode == 0, completed.stdout
     assert completed.stdout.count('XSR-DISPATCH script=egyptian codepoints=1') == 2
     assert completed.stdout.count('XSR-BACKEND script=egyptian codepoints=1') == 2
-    assert len(list(tmp_path.glob('integration.xsr-*.tex'))) == 2
+    assert not list(tmp_path.glob('integration.xsr-*.tex'))
+    assert not list(tmp_path.glob('*.req'))
 
 
 @pytest.mark.skipif(shutil.which('xelatex') is None, reason='xelatex is unavailable')
@@ -197,9 +202,9 @@ def test_host_can_dispatch_complete_run_without_loading_detector(tmp_path: Path)
 @pytest.mark.skipif(shutil.which('xelatex') is None, reason='xelatex is unavailable')
 def test_actual_font_file_cross_font(tmp_path, font):
     preamble = fr'\xsrEgyptianFont{{{font.path.as_posix()}}}'
-    completed = run_xelatex(tmp_path, A + H + chr(0x13437) + B + V + C + chr(0x13438), preamble)
+    completed = run_xelatex(tmp_path, A + H + chr(0x13437) + B + V + C + chr(0x13438), preamble,prepare=True)
     assert_real_layout(completed, 3)
-    response, = tmp_path.glob('integration.xsr-*.tex')
+    response, = tmp_path.glob('.xsr/integration.responses.tex')
     assert font.digest in response.read_text()
     from xsr.font_metrics import encode_path
     assert encode_path(font.path.as_posix()) in response.read_text()
@@ -212,16 +217,19 @@ def test_actual_font_file_cross_font(tmp_path, font):
 def test_preprocessed_font_response_and_scoped_switch(tmp_path):
     from conftest import FONTS
     from xsr.font_metrics import load_font, tex_font_path, font_options
-    from xsr.renderer import default_renderer, response_filename
+    from xsr.renderer import default_renderer, request_digest
+    from xsr.bundle import write_bundle
     renderer = default_renderer()
     text = A + V + B
     body = []
+    responses = {}
     for path in FONTS:
         font = load_font(path)
         options = font_options(path)
-        name = response_filename('integration', 'egyptian', renderer.backend_version('egyptian'), text, options)
-        (tmp_path / name).write_text(renderer.render('egyptian', text, options), encoding='utf-8')
+        digest = request_digest('egyptian', renderer.backend_version('egyptian'), text, options)
+        responses[digest] = renderer.render('egyptian', text, options)
         body.append(fr'{{\xsrEgyptianFont{{{tex_font_path(path)}}}{text}}}')
+    write_bundle(tmp_path, 'integration', responses)
     result = run_xelatex(tmp_path, ' Latin '.join(body), packages=r'\usepackage[mode=preprocess]{xetex-stack-renderer}')
     assert result.returncode == 0, result.stdout
     assert result.stdout.count('path=real-layout') == len(FONTS)
@@ -287,11 +295,11 @@ def test_advanced_ehfc_integration(tmp_path,font):
         text(0x13000,0x13447),text(0x13000,0x13455),text(0x13443),
     ]
     result=run_xelatex(tmp_path,' '.join('{'+case+'}' for case in cases),
-                       fr'\xsrEgyptianDefaultFont{{{font.path.as_posix()}}}')
+                       fr'\xsrEgyptianDefaultFont{{{font.path.as_posix()}}}',prepare=True)
     assert result.returncode==0,result.stdout
     assert result.stdout.count('path=real-layout')==len(cases)
     assert 'XSR-UNAVAILABLE' not in result.stdout
-    responses=''.join(p.read_text(encoding='utf-8') for p in tmp_path.glob('*.xsr-*.tex'))
+    responses=(tmp_path/'.xsr/integration.responses.tex').read_text(encoding='utf-8')
     assert r'\xsrEgyptianTransformedGlyph' in responses
     assert r'\xsrEgyptianDecoration' in responses
     assert font.digest in responses
@@ -304,9 +312,9 @@ def test_unicode_font_directory_and_filename(tmp_path):
     directory.mkdir()
     font=directory/'璞″舰鏂囧瓧 font.ttf'
     shutil.copy2(NEW_GARDINER,font)
-    result=run_xelatex(tmp_path,A+H+B,fr'\xsrEgyptianDefaultFont{{{font.as_posix()}}}')
+    result=run_xelatex(tmp_path,A+H+B,fr'\xsrEgyptianDefaultFont{{{font.as_posix()}}}',prepare=True)
     assert_real_layout(result,2)
-    response,=tmp_path.glob('*.xsr-*.tex')
+    response,=tmp_path.glob('.xsr/integration.responses.tex')
     from xsr.font_metrics import encode_path
     assert encode_path(font.as_posix()) in response.read_text()
 
@@ -361,10 +369,11 @@ def test_clear_tex_errors(tmp_path,preamble,body,code):
 def test_malformed_response_is_reported(tmp_path):
     from conftest import NEW_GARDINER
     from xsr.font_metrics import font_options
-    from xsr.renderer import response_filename
+    from xsr.renderer import request_digest
+    from xsr.bundle import write_bundle
     from xsr.egyptian import BACKEND_VERSION
-    name=response_filename('integration','egyptian',BACKEND_VERSION,A,font_options(NEW_GARDINER))
-    (tmp_path/name).write_text('% truncated response\n')
+    digest=request_digest('egyptian',BACKEND_VERSION,A,font_options(NEW_GARDINER))
+    write_bundle(tmp_path,'integration',{digest:'% truncated response\n'})
     result=run_xelatex(tmp_path,A,packages=r'\usepackage[mode=preprocess]{xetex-stack-renderer}')
     assert result.returncode!=0
     assert 'XSR-RESPONSE' in result.stdout
@@ -376,7 +385,7 @@ def test_failed_invocation_cannot_reuse_old_response(tmp_path):
     from xsr.font_metrics import font_options
     from xsr.renderer import response_filename
     from xsr.egyptian import BACKEND_VERSION
-    name=response_filename('integration','egyptian',BACKEND_VERSION,A,font_options(NEW_GARDINER))
+    name='integration.xsr-response.tex'
     (tmp_path/name).write_text(r'\typeout{STALE-WAS-USED}')
     result=run_xelatex(tmp_path,A,packages=r'\usepackage[mode=shell,renderer-command={xsr-command-does-not-exist}]{xetex-stack-renderer}')
     assert result.returncode!=0
@@ -411,10 +420,10 @@ def test_horizontal_quadrat_wrapping(tmp_path,direction):
 @pytest.mark.skipif(shutil.which('xelatex') is None, reason='xelatex is unavailable')
 def test_editorial_host_context_and_ordinary_punctuation(tmp_path):
     body='Latin [ordinary] {group} '+r'\xsrEgyptianText{['+A+H+B+']}'+' '+r'\xsrEgyptianText{{'+A+'}}'
-    result=run_xelatex(tmp_path,body)
+    result=run_xelatex(tmp_path,body,prepare=True)
     assert result.returncode==0,result.stdout
     assert result.stdout.count('path=real-layout')==2
-    responses=''.join(p.read_text(encoding='utf-8') for p in tmp_path.glob('*.xsr-*.tex'))
+    responses=''.join(p.read_text(encoding='utf-8') for p in tmp_path.glob('.xsr/integration.responses.tex'))
     assert responses.count(r'\xsrEgyptianDecoration')==4
     import fitz
     with fitz.open(tmp_path/'integration.pdf') as pdf:

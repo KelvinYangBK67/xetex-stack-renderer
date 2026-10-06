@@ -105,14 +105,14 @@ def test_preprocess_writes_content_addressed_response_and_manifest(
     ) == 0
 
     manifest = json.loads(
-        (output / 'sample.xsr-manifest.json').read_text(encoding='utf-8')
+        (output / '.xsr/sample.manifest.json').read_text(encoding='utf-8')
     )
     run = manifest['runs'][0]
-    assert manifest['format'] == 'XSR-PREPROCESS-2'
+    assert manifest['format'] == 'XSR-PREPROCESS-3'
     assert run['script'] == 'egyptian'
     assert run['backend_version'] == BACKEND_VERSION
     assert run['options'] == font_options
-    assert run['digest'] in run['response']
+    assert run['digest'] in (output / run['response']).read_text(encoding='utf-8')
     assert (output / run['response']).is_file()
 
 
@@ -125,22 +125,23 @@ def test_changed_run_cannot_reuse_same_numbered_response(tmp_path: Path, font_op
         ['preprocess', '--font', decode_path(font_options['font_codepoints']), '--input', str(source), '--output-dir', str(output)]
     ) == 0
     first_manifest = json.loads(
-        (output / 'sample.xsr-manifest.json').read_text(encoding='utf-8')
+        (output / '.xsr/sample.manifest.json').read_text(encoding='utf-8')
     )
-    first_response = first_manifest['runs'][0]['response']
+    first_response = first_manifest['runs'][0]['digest']
 
     source.write_text(f'ordinary {chr(0x13001)} ordinary\n', encoding='utf-8')
     assert main(
         ['preprocess', '--font', decode_path(font_options['font_codepoints']), '--input', str(source), '--output-dir', str(output)]
     ) == 0
     second_manifest = json.loads(
-        (output / 'sample.xsr-manifest.json').read_text(encoding='utf-8')
+        (output / '.xsr/sample.manifest.json').read_text(encoding='utf-8')
     )
-    second_response = second_manifest['runs'][0]['response']
+    second_response = second_manifest['runs'][0]['digest']
 
     assert first_response != second_response
-    assert (output / first_response).is_file()
-    assert (output / second_response).is_file()
+    bundle = (output / second_manifest['bundle']).read_text(encoding='utf-8')
+    assert first_response not in bundle and second_response in bundle
+    assert not list(output.glob('*.xsr-*.tex'))
 
 
 def test_request_digest_rejects_changed_codepoints(tmp_path: Path, font_options) -> None:

@@ -44,7 +44,6 @@
 \tl_new:N \l_xsr_vector_codes_tl
 \tl_new:N \l_xsr_vector_digest_tl
 \tl_new:N \l_xsr_vector_path_tl
-\prop_new:N \g_xsr_vector_seen_prop
 \cs_generate_variant:Nn\file_mdfive_hash:n{V}
 \cs_generate_variant:Nn\str_map_inline:nn{Vn}
 \cs_new_protected:Npn\xsr_vector_literal:n #1
@@ -64,12 +63,7 @@
   {\str_case:nnF{#1}{{serif}{\xsrVectorStyle{serif}}{sans}{\xsrVectorStyle{sans}}}
     {\msg_fatal:nn{xsr-vector}{literal}}}
 \cs_new_protected:Npn\xsr_vector_request:nn #1#2
-  {\xsr_prepare_request:nn{#1}{#2}
-   \prop_if_in:NVTF\g_xsr_vector_seen_prop\l_xsr_request_digest_tl
-    {\xsr_input_response:}
-    {\xsr_external_render:nn{#1}{#2}
-     \bool_if:NT\l_xsr_response_valid_bool
-      {\prop_gput:NVn\g_xsr_vector_seen_prop\l_xsr_request_digest_tl{1}}}}
+  {\xsr_external_render:nn{#1}{#2}}
 \NewDocumentCommand \xsrVectorGlyph {m}
   {\group_begin:
     \xsr_vector_literal:n{#1}

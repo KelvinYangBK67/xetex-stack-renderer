@@ -45,7 +45,7 @@ jobs:
       - name: Verify Python, geometry, fonts and XeLaTeX
         run: python -m pytest -ra --junitxml=tmp/test-results.xml
       - name: Verify XeLaTeX integration separately
-        run: python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py tests/test_vector_tex.py tests/test_inline_tex.py -q
+        run: python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py tests/test_vector_tex.py tests/test_inline_tex.py tests/test_bundles.py -q
       - name: Rebuild visual showcase without shell escape
         shell: bash
         run: |

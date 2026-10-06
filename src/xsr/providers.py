@@ -51,9 +51,10 @@ class ProviderConfig:
 
 class ExternalProvider:
     """Single-request implementation; obtain_many is an overridable batch seam."""
-    def __init__(self, config, cache_dir):
+    def __init__(self, config, cache_dir=None):
         self.config = config
-        self.cache_dir = Path(cache_dir)
+        self.cache_dir = Path(cache_dir) if cache_dir is not None else None
+        self._results = {}
 
     def obtain_many(self, requests):
         return [self.obtain(glyph, style) for glyph, style in requests]
@@ -61,10 +62,15 @@ class ExternalProvider:
     def obtain(self, glyph, style):
         key = RenderCache.key('provider', IMPORT_VERSION, glyph,
                               self.config.identity() | {'style': style})
-        cache = self.cache_dir / 'providers'
-        cache.mkdir(parents=True, exist_ok=True)
-        target = cache / (key + '.svg')
-        if target.exists():
+        if self.cache_dir is None and key in self._results:
+            data = self._results[key]
+            import_svg(data)
+            return data
+        cache = self.cache_dir / 'providers' if self.cache_dir is not None else None
+        if cache is not None:
+            cache.mkdir(parents=True, exist_ok=True)
+        target = cache / (key + '.svg') if cache is not None else None
+        if target is not None and target.exists():
             data = target.read_bytes()
             try:
                 import_svg(data)  # Revalidate cached interchange.
@@ -101,6 +107,9 @@ class ExternalProvider:
                 import_svg(data)
             except XSRError as error:
                 raise XSRError('XSR-PROVIDER-SVG', str(error)) from error
+            if target is None:
+                self._results[key] = data
+                return data
             output.replace(target)
             # Result bytes are authoritative; metadata is optional, not guessed.
             target.with_suffix('.json').write_text(json.dumps({

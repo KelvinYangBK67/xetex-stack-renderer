@@ -42,8 +42,10 @@ def test_direct_unicode_geometry_cache_and_change(tmp_path, mode):
     body = r'Before \setbox0=\hbox{\xsrVectorGlyph{瀛楀舰.svg}}\typeout{VECTOR-SIZE=\the\wd0,\the\ht0,\the\dp0}\box0 after. \xsrVectorGlyph{瀛楀舰.svg}'
     output = compile_document(tmp_path, body, mode=mode, prepare=mode=='preprocess')
     assert 'VECTOR-SIZE=10.0pt,10.0pt,0.0pt' in output
-    assert len(list(tmp_path.glob('vector.xsr-*.tex'))) == 1
-    assert len(list((tmp_path/'.xsr-cache').glob('*.tex'))) == 1
+    assert not list(tmp_path.glob('vector.xsr-*.tex'))
+    assert not (tmp_path/'.xsr-cache').exists()
+    if mode == 'preprocess':
+        assert (tmp_path/'.xsr/vector.responses.tex').read_text().count(r'\xsrDeclareResponse') == 1
     with fitz.open(tmp_path/'vector.pdf') as pdf:
         assert 'Before' in pdf[0].get_text() and 'after.' in pdf[0].get_text()
         assert len(pdf[0].get_drawings()) == 2
@@ -53,7 +55,9 @@ def test_direct_unicode_geometry_cache_and_change(tmp_path, mode):
             assert drawing['rect'].height == pytest.approx(8, abs=.1)
     path.write_text('<svg viewBox="0 0 200 200"><path d="M0 0L200 200L0 200Z"/></svg>')
     compile_document(tmp_path, body, mode=mode, prepare=mode=='preprocess')
-    assert len(list(tmp_path.glob('vector.xsr-*.tex'))) == 2
+    assert not list(tmp_path.glob('vector.xsr-*.tex'))
+    if mode == 'preprocess':
+        assert (tmp_path/'.xsr/vector.responses.tex').read_text().count(r'\xsrDeclareResponse') == 1
 
 
 @pytest.mark.parametrize('mode', ['shell','preprocess'])
@@ -103,8 +107,9 @@ def test_kss_missing_visible_only(tmp_path, mode):
     output = compile_document(tmp_path, fr'Before \xsrKhitanText{{{text}}} after.', preamble, mode, prepare=mode=='preprocess')
     assert 'XSR-GLYPH-MISSING' in output
     assert 'height=2' in output
-    response = '\n'.join(p.read_text() for p in tmp_path.glob('vector.xsr-*.tex'))
-    assert response.count('xsrKhitanSynthetic') == 1
+    if mode == 'preprocess':
+        response = (tmp_path/'.xsr/vector.responses.tex').read_text()
+        assert response.count('xsrKhitanSynthetic') == 1
     if mode == 'shell':
         output = compile_document(tmp_path, fr'\xsrKhitanText{{{chr(0x18CFF)}}}', preamble+r'\xsrMissingGlyphPolicy{error}', success=False)
         assert 'XSR-GLYPH-MISSING' in output

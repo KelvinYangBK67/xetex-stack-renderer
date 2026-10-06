@@ -9,7 +9,8 @@ import tempfile
 from xsr import build_default_registry
 from xsr.egyptian.source import source_runs
 from xsr.font_metrics import load_font, tex_font_path, font_options
-from xsr.renderer import default_renderer, response_filename
+from xsr.renderer import default_renderer, request_digest
+from xsr.bundle import write_bundle
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -36,7 +37,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix='showcase-',dir=scratch) as directory:
         build=Path(directory)
         config=[fr'\newcommand\XSRFontCount{{{len(args.font)}}}']
-        renderer=default_renderer(build/'.xsr-cache')
+        renderer=default_renderer()
+        responses={}
         runs={run.text for run in source_runs(source.read_text(encoding='utf-8'),build_default_registry())}
         for index,path in enumerate(args.font):
             font=load_font(path)
@@ -46,9 +48,10 @@ def main():
             for direction in ('ltr','rtl'):
                 options=font_options(path) | ({'direction':'rtl'} if direction=='rtl' else {})
                 for text in sorted(runs):
-                    name=response_filename(source.stem,'egyptian',renderer.backend_version('egyptian'),text,options)
-                    (build/name).write_text(renderer.render('egyptian',text,options),encoding='utf-8')
+                    digest=request_digest('egyptian',renderer.backend_version('egyptian'),text,options)
+                    responses[digest]=renderer.render('egyptian',text,options)
             print(f'{font.name}: UPEM={font.units_per_em}, MD5={font.digest}')
+        write_bundle(build,source.stem,responses)
         for name in ('showcase-fonts.tex','font-metrics-fonts.tex'):
             (build/name).write_text('\n'.join(config),encoding='utf-8')
         env=os.environ.copy()

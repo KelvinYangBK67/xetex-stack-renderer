@@ -19,7 +19,9 @@ AVAILABLE = shutil.which('xelatex') is not None and FONT.is_file()
 requires_tex = pytest.mark.skipif(not AVAILABLE, reason='XeLaTeX or Noto KSS font unavailable')
 
 
-def compile_tex(tmp_path, body, preamble='', mode='shell', shell=True):
+def compile_tex(tmp_path, body, preamble='', mode='shell', shell=True, prepare=False):
+    if prepare:
+        mode, shell = 'preprocess', False
     source = tmp_path / 'integration.tex'
     preamble = preamble or fr'\xsrKhitanDefaultFont{{{FONT.as_posix()}}}'
     source.write_text(
@@ -27,6 +29,8 @@ def compile_tex(tmp_path, body, preamble='', mode='shell', shell=True):
         + fr'\usepackage[mode={mode}]{{xetex-stack-renderer}}' + '\n'
         + preamble + '\n\\begin{document}\n'
         + body + '\n\\end{document}\n', encoding='utf-8')
+    if prepare:
+        main(['preprocess','--input',str(source),'--output-dir',str(tmp_path)])
     env = os.environ.copy()
     env['TEXINPUTS'] = str(ROOT / 'tex') + os.pathsep + env.get('TEXINPUTS', '')
     env['PYTHONPATH'] = str(ROOT / 'src') + os.pathsep + env.get('PYTHONPATH', '')
@@ -64,10 +68,10 @@ def test_type_b_lengths(tmp_path, length):
 @requires_tex
 @pytest.mark.parametrize(('separator', 'gap'), [(' ', '0.2'), (Z, '0')])
 def test_separator_gap_and_single_dispatch(tmp_path, separator, gap):
-    output, _ = compile_tex(tmp_path, fr'Latin \xsrKhitanText{{{A+B+separator+A+B}}} Latin')
+    output, _ = compile_tex(tmp_path, fr'Latin \xsrKhitanText{{{A+B+separator+A+B}}} Latin',prepare=True)
     assert output.count('XSR-LAYOUT script=khitan glyphs=2') == 2
     assert output.count('XSR-DISPATCH script=khitan') == 1
-    responses = list(tmp_path.glob('integration.xsr-*.tex'))
+    responses = list(tmp_path.glob('.xsr/integration.responses.tex'))
     assert any(fr'\xsrKhitanBreak{{{gap}}}' in p.read_text(encoding='utf-8')
                for p in responses)
 
@@ -83,9 +87,9 @@ def test_auto_detector_preserves_internal_space_and_latin_neighbors(tmp_path):
 def test_custom_gap_and_scoped_font(tmp_path):
     preamble = fr'\xsrKhitanDefaultFont{{{FONT.as_posix()}}}'
     body = fr'{{\xsrKhitanClusterGap{{0.35}}\xsrKhitanFont{{{FONT.as_posix()}}}\xsrKhitanText{{{A} {B}}}}}'
-    output, _ = compile_tex(tmp_path, body, preamble=preamble)
+    output, _ = compile_tex(tmp_path, body, preamble=preamble,prepare=True)
     assert r'\xsrKhitanBreak{0.35}' in '\n'.join(
-        p.read_text(encoding='utf-8') for p in tmp_path.glob('integration.xsr-*.tex'))
+        p.read_text(encoding='utf-8') for p in tmp_path.glob('.xsr/integration.responses.tex'))
     assert 'XSR-LAYOUT script=khitan glyphs=1' in output
 
 
@@ -157,11 +161,11 @@ def test_linear_font_and_missing_sign(tmp_path):
 @requires_tex
 def test_auto_detector_type_b_and_zwsp(tmp_path):
     body = f'Latin {A+F+B}{Z}{A+B} end.'
-    output, _ = compile_tex(tmp_path, body)
+    output, _ = compile_tex(tmp_path, body,prepare=True)
     assert output.count('XSR-DISPATCH script=khitan codepoints=6') == 1
     assert output.count('XSR-LAYOUT script=khitan glyphs=2') == 2
     assert any(r'\xsrKhitanBreak{0}' in p.read_text(encoding='utf-8')
-               for p in tmp_path.glob('integration.xsr-*.tex'))
+               for p in tmp_path.glob('.xsr/integration.responses.tex'))
 
 
 @requires_tex

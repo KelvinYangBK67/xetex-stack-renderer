@@ -299,8 +299,9 @@ xelatex -no-shell-escape -output-directory=build document.tex
 
 Preprocess discovers literal direct/provider/KAGE commands, follows literal
 input/include files, and tracks brace-scoped provider/style/policy selections.
-Each unique provider request is generated once; responses are content-addressed
-and final TeX compilation invokes no provider. Keep the local SVG/configuration
+Each unique provider request is generated once per invocation. Responses retain
+their content-addressed identities inside one document bundle; final TeX
+compilation invokes no provider. Keep the local SVG/configuration
 files available for their content checks. Changing either requires preprocessing
 again. Arbitrary macro expansion, conditionals and dynamically assembled commands
 are outside the conservative source discoverer's scope. Existing font discovery
@@ -311,13 +312,14 @@ Direct SVG cache identity includes normalized absolute source path, content MD5
 and rendering options. Provider identity includes executable/prefix arguments,
 configuration/options/metadata, identifier, style, resulting SVG SHA-256 and
 importer version. Cached SVG remains interchange and is revalidated on import;
-the final response contains PGF geometry. Provider records retain the content
+the final response contains PGF geometry. When persistent caching is explicitly enabled, provider records retain the content
 digest and metadata next to cached SVG. A result digest is never inferred from
 an identifier alone.
 
-In shell mode the first glyph calls the provider, imports SVG and caches the
-response. Repeated requests in the same document reuse the response without
-starting another provider. Successful producer results persist across builds.
+In shell mode the first glyph calls the provider and imports SVG. Repeated
+requests in the same document reuse an unexpanded in-memory response without
+starting another provider. Persistent caching is disabled by default; producer
+results persist across builds only with an explicit cache directory.
 Provider failures are not stored as successful SVG; their typed fallback
 responses can still be reused within the TeX document. Change the configuration
 metadata revision or remove the provider cache when the engine/dataset changes.
@@ -588,9 +590,47 @@ python -m xsr.renderer preprocess --input document.tex --output-dir . --tex-work
 xelatex -no-shell-escape document.tex
 ```
 
+Ordinary preprocessing writes only two XSR files beneath the output directory:
+
+```text
+.xsr/
+    document.responses.tex
+    document.manifest.json
+```
+
+The bundle contains one unexpanded response body per unique request digest.
+It is rewritten atomically with deterministic digest ordering on every successful
+preprocess invocation; removed/changed requests do not accumulate old entries.
+The manifest records each logical run, its digest key and the common bundle path.
+No per-request response files, `.req` files or `.xsr-cache` are created.
+Keep the bundle for repeated no-shell builds; delete `.xsr/` when no longer needed.
+The TeX core loads it once and evaluates each response at use time, so current
+font metrics, `scale` and `raise` remain local to each occurrence. Missing bundles
+and missing keys produce `XSR-BUNDLE-MISSING` and `XSR-RESPONSE-MISSING` respectively;
+malformed bodies retain `XSR-RESPONSE` validation.
+
+Python `default_renderer()` / `Renderer(cache=None)` and provider acquisition are
+cacheless by default. Provider output uses temporary storage which is removed
+when acquisition completes, plus in-memory reuse during one invocation. Opt in
+to persistent caching with `--cache-dir PATH` (Python preprocess/render CLI) or
+`cache-dir=PATH` (TeX shell mode). Explicit provider caches retain their existing
+SVG revalidation and revision-metadata rules.
+
+Shell/auto fallback uses one fixed `<job>.xsr-request.req` / `<job>.xsr-response.tex`
+scratch pair, not one pair per digest. Python consumes each request; successful
+TeX builds remove the remaining scratch pair at document end. A failed/interrupted
+build may retain the scratch response for diagnosis. Auto mode first tries a
+matching bundled response, then shell execution if allowed. No new shell escape
+permission, pipes or shell-specific cleanup command is required.
+
+When migrating a 0.10 document directory, obsolete `<job>.xsr-<hash>.tex`, the old
+`<job>.xsr-manifest.json`, and an unwanted `.xsr-cache/` may be removed manually.
+The new workflow ignores those old responses and does not delete existing files
+that may be shared with another build.
+
 The preprocessor recursively follows literal `\input{file}` and `\include{file}`,
-appending `.tex` when needed. It searches input-root directories, then the containing
-source directory. Cycles and missing files are errors. Repeat `--input` for multiple
+appending `.tex` when needed. It searches the containing source directory first,
+then the explicit input-root directories in order. Cycles and missing files are errors. Repeat `--input` for multiple
 roots and `--font` for additional absolute font selections. `--tex-workdir` defaults
 to the output directory and controls resolution of discovered relative font paths.
 `--jobname` must match XeLaTeX when overriding its normal job name.
@@ -635,7 +675,7 @@ python scripts/fetch_noto.py
 python scripts/fetch_newgardiner.py
 python scripts/fetch_khitan.py
 python -m pytest
-python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py tests/test_vector_tex.py tests/test_inline_tex.py
+python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py tests/test_vector_tex.py tests/test_inline_tex.py tests/test_bundles.py
 python scripts/build_showcase.py --font tmp/fonts/NotoSansEgyptianHieroglyphs-Regular.ttf --font tmp/fonts/NewGardiner.ttf --font C:/Windows/Fonts/seguihis.ttf
 python scripts/check_showcase.py examples/egyptian-showcase.pdf
 python scripts/build_khitan_showcase.py --font tmp/fonts/NotoSerifKhitanSmallScript-Regular.ttf --comparison-font D:/_INBOX/Download/KhitanSmallLinear.ttf

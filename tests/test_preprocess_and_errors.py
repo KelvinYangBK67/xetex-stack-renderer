@@ -43,11 +43,12 @@ def test_multiple_inputs_fonts_and_repeated_runs(tmp_path,font_options):
     args=['preprocess','--input',str(a),'--input',str(b),'--output-dir',str(output),
           '--font',decode_path(font_options['font_codepoints'])]
     assert main(args)==0
-    manifest=(output/'a.xsr-manifest.json').read_text(encoding='utf-8')
+    manifest=(output / '.xsr/a.manifest.json').read_text(encoding='utf-8')
     assert len(json.loads(manifest)['sources'])==2
-    assert len(list(output.glob('*.xsr-*.tex')))==2
+    assert not list(output.glob('*.xsr-*.tex'))
+    assert (output/'.xsr/a.responses.tex').read_text().count(r'\xsrDeclareResponse')==2
     assert main(args)==0
-    assert (output/'a.xsr-manifest.json').read_text(encoding='utf-8')==manifest
+    assert (output / '.xsr/a.manifest.json').read_text(encoding='utf-8')==manifest
 
 
 def test_font_error_categories(tmp_path):

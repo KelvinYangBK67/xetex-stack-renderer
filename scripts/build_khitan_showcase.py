@@ -9,7 +9,8 @@ import tempfile
 from xsr import build_default_registry
 from xsr.errors import XSRError
 from xsr.font_metrics import load_font, font_options, tex_font_path
-from xsr.renderer import default_renderer, response_filename
+from xsr.renderer import default_renderer, request_digest
+from xsr.bundle import write_bundle
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -19,7 +20,7 @@ def khitan_runs(source):
             if run.script == 'khitan'}
 
 
-def prepare(renderer, build, jobname, font, runs):
+def prepare(renderer, responses, font, runs):
     options = font_options(font.path) | {'cluster_gap': 0.2}
     count = 0
     for text in sorted(runs):
@@ -30,9 +31,9 @@ def prepare(renderer, build, jobname, font, runs):
                 # An optional comparison font can cover a sign absent in Noto.
                 continue
             raise
-        name = response_filename(jobname, 'khitan',
+        digest = request_digest('khitan',
                                  renderer.backend_version('khitan'), text, options)
-        (build/name).write_text(response, encoding='utf-8')
+        responses[digest] = response
         count += 1
     return count
 
@@ -65,11 +66,13 @@ def main():
             extra = ''
         (build/'khitan-showcase-fonts.tex').write_text(config, encoding='utf-8')
         (build/'khitan-extra.tex').write_text(extra, encoding='utf-8')
-        renderer = default_renderer(build/'.xsr-cache')
+        renderer = default_renderer()
+        responses = {}
         runs = khitan_runs(source.read_text(encoding='utf-8') + extra)
-        count = prepare(renderer, build, source.stem, noto, runs)
+        count = prepare(renderer, responses, noto, runs)
         if linear:
-            count += prepare(renderer, build, source.stem, linear, khitan_runs(extra))
+            count += prepare(renderer, responses, linear, khitan_runs(extra))
+        write_bundle(build, source.stem, responses)
         env = os.environ.copy()
         env['TEXINPUTS'] = str(ROOT/'tex')+os.pathsep+env.get('TEXINPUTS', '')
         result = subprocess.run(

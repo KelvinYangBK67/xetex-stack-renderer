@@ -46,7 +46,8 @@ def test_no_shell_preprocess_registry_and_repeat(tmp_path,extension):
     make_asset(tmp_path/('字形.'+extension),100,200)
     preamble=fr'\GlyphRegister{{test}}{{字形.{extension}}}\GlyphRegister{{test}}{{字形.{extension}}}'
     compile_document(tmp_path,r'Before \Glyph{test} \Glyph{test} after.',preamble,mode='preprocess',prepare=True)
-    assert len(list(tmp_path.glob('vector.xsr-*.tex')))==1
+    assert (tmp_path/'.xsr/vector.responses.tex').read_text().count(r'\xsrDeclareResponse')==1
+    assert not list(tmp_path.glob('vector.xsr-*.tex'))
     assert not list(tmp_path.glob('*.req'))
     with fitz.open(tmp_path/'vector.pdf') as pdf:
         assert 'Before' in pdf[0].get_text()
@@ -121,9 +122,9 @@ def test_provider_and_registration_use_same_vector_metrics(tmp_path):
     make_asset(tmp_path/'glyph.svg',200,200)
     body=(r'\setbox0=\hbox{\Glyph{test}}\setbox1=\hbox{\xsrKageGlyph{test-glyph}}'
           r'\typeout{COMMON-WIDTH=\the\wd0,\the\wd1}\box0\box1')
-    output=compile_document(tmp_path,body,r'\GlyphRegister{test}{glyph.svg}\xsrKageProvider{provider.json}')
+    output=compile_document(tmp_path,body,r'\GlyphRegister{test}{glyph.svg}\xsrKageProvider{provider.json}',mode='preprocess',prepare=True)
     assert 'COMMON-WIDTH=10.0pt,10.0pt' in output
-    responses=''.join(p.read_text(encoding='utf-8') for p in tmp_path.glob('vector.xsr-*.tex'))
+    responses=(tmp_path/'.xsr/vector.responses.tex').read_text(encoding='utf-8')
     assert responses.count(r'\xsrInlineGlyph')==2
 
 
@@ -152,17 +153,19 @@ def test_negative_raise_and_all_sizes_share_response(tmp_path):
     body=box_body('raise=-3pt')+r'{\small\Glyph{test}}{\Large\Glyph[scale=2]{test}}'
     output=compile_document(tmp_path,body,r'\GlyphRegister{test}{glyph.png}',mode='preprocess',prepare=True)
     assert measured(output)==pytest.approx((10.56,7.5,3.5),abs=.003)
-    assert len(list(tmp_path.glob('vector.xsr-*.tex')))==1
+    assert (tmp_path/'.xsr/vector.responses.tex').read_text().count(r'\xsrDeclareResponse')==1
+    assert not list(tmp_path.glob('vector.xsr-*.tex'))
 
 
 def test_changed_image_invalidates_response(tmp_path):
     path=make_asset(tmp_path/'glyph.png')
     preamble=r'\GlyphRegister{test}{glyph.png}'
-    first=compile_document(tmp_path,box_body(),preamble)
+    first=compile_document(tmp_path,box_body(),preamble,mode="preprocess",prepare=True)
     make_asset(path,120,240)
-    second=compile_document(tmp_path,box_body(),preamble)
+    second=compile_document(tmp_path,box_body(),preamble,mode="preprocess",prepare=True)
     assert measured(first)!=measured(second)
-    assert len(list(tmp_path.glob('vector.xsr-*.tex')))==2
+    assert not list(tmp_path.glob('vector.xsr-*.tex'))
+    assert (tmp_path/'.xsr/vector.responses.tex').read_text().count(r'\xsrDeclareResponse')==1
 
 
 

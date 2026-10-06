@@ -17,7 +17,7 @@ def test_repeated_include_styles_and_policies(tmp_path):
         r'{\xsrKageStyle{serif}\xsrMissingGlyphPolicy{box}\input{child}}')
     (tmp_path/'child.tex').write_text(r'\xsrKageGlyph{same}')
     main(['preprocess','--input',str(source),'--output-dir',str(tmp_path)])
-    runs=json.loads((tmp_path/'main.xsr-manifest.json').read_text())['runs']
+    runs=json.loads((tmp_path / '.xsr/main.manifest.json').read_text())['runs']
     assert [(r['options']['style'],r['options']['missing_glyph_policy']) for r in runs] == [('sans','error'),('serif','box')]
     assert len((tmp_path/'calls.jsonl').read_text().splitlines()) == 2
     spans=policy_spans(discover_sources([source]))[(tmp_path/'child.tex').resolve()]
@@ -29,7 +29,7 @@ def test_repeated_explicit_input_executes_again(tmp_path):
     source=tmp_path/'main.tex'
     source.write_text(r'\xsrKageProvider{provider.json}\xsrKageGlyph{same}')
     main(['preprocess','--input',str(source),'--input',str(source),'--output-dir',str(tmp_path)])
-    runs=json.loads((tmp_path/'main.xsr-manifest.json').read_text())['runs']
+    runs=json.loads((tmp_path / '.xsr/main.manifest.json').read_text())['runs']
     assert len(runs)==2
     assert len((tmp_path/'calls.jsonl').read_text().splitlines())==1
 
@@ -62,6 +62,6 @@ def test_font_run_included_under_each_policy(tmp_path):
         r'{\xsrMissingGlyphPolicy{box}\input{child}}')
     (tmp_path/'child.tex').write_text(chr(0x13000),encoding='utf-8')
     main(['preprocess','--input',str(source),'--output-dir',str(tmp_path)])
-    runs=json.loads((tmp_path/'main.xsr-manifest.json').read_text())['runs']
+    runs=json.loads((tmp_path / '.xsr/main.manifest.json').read_text())['runs']
     assert {r['options'].get('missing_glyph_policy','box') for r in runs}=={'box','error'}
-    assert len({r['response'] for r in runs})==2
+    assert len({r['digest'] for r in runs})==2

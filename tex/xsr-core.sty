@@ -36,7 +36,7 @@
 \bool_new:N \g_xsr_trace_bool
 \tl_gset:Nn \g_xsr_mode_tl { auto }
 \tl_gset:Nn \g_xsr_renderer_command_tl { python~-m~xsr.renderer }
-\tl_gset:Nn \g_xsr_cache_dir_tl { .xsr-cache }
+\tl_gclear:N \g_xsr_cache_dir_tl
 \tl_gset:Nx \g_xsr_renderer_options_tl
   { \c_left_brace_str \c_right_brace_str }
 \bool_gset_true:N \g_xsr_trace_bool
@@ -113,9 +113,9 @@
     \tl_set:Nx \l_xsr_request_digest_tl
       { \str_mdfive_hash:e { \l_xsr_signature_tl } }
     \tl_set:Nx \l_xsr_request_file_tl
-      { \c_sys_jobname_str .xsr-\l_xsr_request_digest_tl .req }
+      { \c_sys_jobname_str .xsr-request.req }
     \tl_set:Nx \l_xsr_response_file_tl
-      { \c_sys_jobname_str .xsr-\l_xsr_request_digest_tl .tex }
+      { \c_sys_jobname_str .xsr-response.tex }
   }
 
 \cs_new_protected:Npn \xsr_write_request:n #1
@@ -134,13 +134,36 @@
     \iow_close:N \g_xsr_request_iow
   }
 
+% Bundle declarations and shell results store unexpanded bodies. Runtime font,
+% scale and raise are evaluated only when the requested response is executed.
+\prop_new:N \g_xsr_responses_prop
+\bool_new:N \g_xsr_bundle_loaded_bool
+\bool_new:N \g_xsr_shell_used_bool
+\tl_new:N \l_xsr_response_body_tl
+\tl_new:N \l_xsr_bundle_file_tl
+\msg_new:nnn{xsr}{bundle-missing}{[XSR-BUNDLE-MISSING]~Preprocess~bundle~not~found:~#1.}
+\msg_new:nnn{xsr}{digest-missing}{[XSR-RESPONSE-MISSING]~Request~#1~is~absent~from~the~bundle;~run~preprocess~again.}
+\NewDocumentCommand\xsrDeclareResponse{m +m}
+  {\prop_gput:Nnn\g_xsr_responses_prop{#1}{#2}}
+\cs_new_protected:Npn\xsr_load_bundle:
+  {\bool_if:NF\g_xsr_bundle_loaded_bool
+    {\tl_set:Nx\l_xsr_bundle_file_tl{.xsr/\c_sys_jobname_str.responses.tex}
+     \file_if_exist:VT\l_xsr_bundle_file_tl
+       {\exp_args:NV\file_input:n\l_xsr_bundle_file_tl}
+     \bool_gset_true:N\g_xsr_bundle_loaded_bool}}
+\cs_new_protected:Npn\xsr_execute_response:
+  {\bool_set_false:N\l_xsr_response_valid_bool
+   \prop_get:NVN\g_xsr_responses_prop\l_xsr_request_digest_tl\l_xsr_response_body_tl
+   \tl_use:N\l_xsr_response_body_tl
+   \bool_if:NF\l_xsr_response_valid_bool
+     {\msg_fatal:nnx{xsr}{malformed-response}{\l_xsr_request_digest_tl}}}
 \cs_new_protected:Npn \xsr_input_response:
-  {
-    \bool_set_false:N \l_xsr_response_valid_bool
-    \exp_args:NV \file_input:n \l_xsr_response_file_tl
-    \bool_if:NF \l_xsr_response_valid_bool
-      {\msg_fatal:nnx{xsr}{malformed-response}{\l_xsr_response_file_tl}}
-  }
+  {\exp_args:NV\file_get:nnN\l_xsr_response_file_tl{}\l_xsr_response_body_tl
+   \prop_gput:NVV\g_xsr_responses_prop\l_xsr_request_digest_tl\l_xsr_response_body_tl
+   \xsr_execute_response:}
+\AddToHook{enddocument/afterlastpage}
+  {\bool_if:NT\g_xsr_shell_used_bool
+    {\sys_shell_now:x{\g_xsr_renderer_command_tl\c_space_tl cleanup\c_space_tl --jobname\c_space_tl\c_sys_jobname_str}}}
 
 \cs_new_protected:Npn \xsr_unavailable_stub:nn #1#2
   {
@@ -153,6 +176,7 @@
   {
     \sys_if_shell_unrestricted:TF
       {
+        \bool_gset_true:N\g_xsr_shell_used_bool
         \xsr_write_request:n {#1}
         % A failed invocation must never reuse a stale successful response.
         \iow_open:NV \g_xsr_request_iow \l_xsr_response_file_tl
@@ -164,7 +188,9 @@
             \c_space_tl --backend \c_space_tl #1
             \c_space_tl --input \c_space_tl \l_xsr_request_file_tl
             \c_space_tl --output \c_space_tl \l_xsr_response_file_tl
-            \c_space_tl --cache-dir \c_space_tl \g_xsr_cache_dir_tl
+            \c_space_tl --consume-request
+            \tl_if_empty:NF\g_xsr_cache_dir_tl
+              {\c_space_tl --cache-dir \c_space_tl \g_xsr_cache_dir_tl}
           }
         \file_if_exist:VTF \l_xsr_response_file_tl
           { \xsr_input_response: }
@@ -181,34 +207,25 @@
   }
 
 \cs_new_protected:Npn \xsr_preprocessed_or_stub:nn #1#2
-  {
-    \file_if_exist:VTF \l_xsr_response_file_tl
-      { \xsr_input_response: }
-      {
-        \msg_warning:nnx { xsr } { preprocess-missing }
-          { \l_xsr_response_file_tl }
-        \xsr_unavailable_stub:nn {#1} {#2}
-      }
-  }
+  {\tl_set:Nx\l_xsr_bundle_file_tl{.xsr/\c_sys_jobname_str.responses.tex}
+   \file_if_exist:VF\l_xsr_bundle_file_tl
+     {\msg_fatal:nnx{xsr}{bundle-missing}{\l_xsr_bundle_file_tl}}
+   \xsr_load_bundle:
+   \prop_if_in:NVTF\g_xsr_responses_prop\l_xsr_request_digest_tl
+     {\xsr_execute_response:}
+     {\msg_fatal:nnx{xsr}{digest-missing}{\l_xsr_request_digest_tl}}}
 
-% Backend-facing interface: receive one complete run and select invocation mode.
+% Backend-facing interface: identity is unchanged; transport is mode-specific.
 \cs_new_protected:Npn \xsr_external_render:nn #1#2
-  {
-    \xsr_prepare_request:nn {#1} {#2}
-    \str_case:VnF \g_xsr_mode_tl
-      {
-        { shell }     { \xsr_shell_render:nn {#1} {#2} }
-        { preprocess }{ \xsr_preprocessed_or_stub:nn {#1} {#2} }
-        { stub }      { \xsr_unavailable_stub:nn {#1} {#2} }
-        { auto }
-          {
-            \file_if_exist:VTF \l_xsr_response_file_tl
-              { \xsr_input_response: }
-              { \xsr_shell_render:nn {#1} {#2} }
-          }
-      }
-      { \xsr_unavailable_stub:nn {#1} {#2} }
-  }
+  {\xsr_prepare_request:nn{#1}{#2}
+   \str_if_eq:VnT\g_xsr_mode_tl{auto}{\xsr_load_bundle:}
+   \str_if_eq:VnTF\g_xsr_mode_tl{stub}
+     {\xsr_unavailable_stub:nn{#1}{#2}}
+     {\prop_if_in:NVTF\g_xsr_responses_prop\l_xsr_request_digest_tl
+       {\xsr_execute_response:}
+       {\str_if_eq:VnTF\g_xsr_mode_tl{preprocess}
+         {\xsr_preprocessed_or_stub:nn{#1}{#2}}
+         {\xsr_shell_render:nn{#1}{#2}}}}}
 
 % Stable response command emitted by successful Python backends.
 \cs_new_protected:Npn \xsr_backend_result:nnnnn #1#2#3#4#5

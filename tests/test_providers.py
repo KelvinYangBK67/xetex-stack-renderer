@@ -96,7 +96,7 @@ def test_preprocess_external_identifier_is_not_font_text(tmp_path):
     glyph = chr(0x13000)+chr(0x18CFF)
     source.write_text(r'\xsrKageProvider{provider.json}'+fr'\xsrKageGlyph{{{glyph}}}', encoding='utf-8')
     assert main(['preprocess','--input',str(source),'--output-dir',str(tmp_path)]) == 0
-    manifest = json.loads((tmp_path/'external.xsr-manifest.json').read_text())
+    manifest = json.loads((tmp_path / '.xsr/external.manifest.json').read_text())
     assert [run['script'] for run in manifest['runs']] == ['provider']
     assert json.loads((tmp_path/'calls.jsonl').read_text())['glyph'] == glyph
 

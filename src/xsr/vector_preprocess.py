@@ -6,7 +6,7 @@ from .source_traversal import entrypoints, resolve_include
 from .inline import GlyphRegistry
 import math
 from .vector_backend import input_options
-from .renderer import request_digest, response_filename, write_tex
+from .renderer import request_digest
 
 COMMAND = re.compile(r'\\xsr(VectorGlyph|ProviderGlyph|KageGlyph|VectorProvider|KageProvider|VectorStyle|KageStyle|MissingGlyphPolicy)\s*\{([^{}]*)\}')
 INCLUDE = re.compile(r'\\(?:input|include)\s*\{([^{}]+)\}')
@@ -16,8 +16,8 @@ INLINE_COMMAND = re.compile(REGISTER.pattern + '|' + USE.pattern)
 TOKEN = re.compile(COMMAND.pattern + '|' + INLINE_COMMAND.pattern + '|' + INCLUDE.pattern + r'|[{}]')
 
 
-def prepare_vectors(sources, workdir, output_dir, jobname, renderer):
-    runs, emitted = [], set()
+def prepare_vectors(sources, workdir, bundle, renderer, responses):
+    runs = []
     registry = GlyphRegistry(workdir)
     state = {'provider': '', 'style': 'serif', 'missing_glyph_policy': 'box'}
     stack, active = [], set()
@@ -102,13 +102,11 @@ def prepare_vectors(sources, workdir, output_dir, jobname, renderer):
                 options, actual = options | common, actual | common
             version = renderer.backend_version(script)
             digest = request_digest(script, version, text, options)
-            filename = response_filename(jobname, script, version, text, options)
-            if digest not in emitted:
-                write_tex(output_dir/filename, renderer.render(script, text, actual))
-                emitted.add(digest)
+            if digest not in responses:
+                responses[digest] = renderer.render(script, text, actual)
             runs.append(dict(digest=digest, script=script, backend_version=version,
                              options=options, source=str(path), start=token.start(), end=token.end(),
-                             codepoints=[f'{ord(c):X}' for c in text], response=filename))
+                             codepoints=[f'{ord(c):X}' for c in text], response=bundle))
 
         active.remove(path)
 

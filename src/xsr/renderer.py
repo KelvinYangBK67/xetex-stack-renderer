@@ -138,9 +138,9 @@ def default_renderer(cache_dir: str | Path | None = None) -> Renderer:
     renderer.register(EgyptianBackend())
     renderer.register(KhitanBackend())
     from .vector_backend import VectorBackend
-    renderer.register(VectorBackend('vector', cache_dir or '.xsr-cache'))
-    renderer.register(VectorBackend('asset', cache_dir or '.xsr-cache'))
-    renderer.register(VectorBackend('provider', cache_dir or '.xsr-cache'))
+    renderer.register(VectorBackend('vector', cache_dir))
+    renderer.register(VectorBackend('asset', cache_dir))
+    renderer.register(VectorBackend('provider', cache_dir))
     return renderer
 
 
@@ -199,7 +199,11 @@ def render_request(args: argparse.Namespace) -> int:
             f'request is for {request.script!r}, but {args.backend!r} was requested'
         )
     expected_name = f'.xsr-{request.digest}.tex'
-    if not args.output.name.endswith(expected_name):
+    scratch_output = args.input.name.removesuffix('.xsr-request.req') + '.xsr-response.tex'
+    scratch_pair = (args.input.name.endswith('.xsr-request.req')
+                    and args.output.name == scratch_output
+                    and args.input.resolve().parent == args.output.resolve().parent)
+    if not scratch_pair and not args.output.name.endswith(expected_name):
         raise ValueError(f'response filename must end with {expected_name}')
 
     renderer = default_renderer(args.cache_dir)
@@ -221,6 +225,14 @@ def preprocess(args: argparse.Namespace) -> int:
     return prepare_sources(args)
 
 
+def cleanup_shell(args):
+    from .bundle import bundle_path
+    bundle_path(args.jobname)  # Validate a single filename stem, never a path.
+    for suffix in ('.xsr-request.req', '.xsr-response.tex'):
+        Path(args.jobname+suffix).unlink(missing_ok=True)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog='xsr-render')
     subparsers = parser.add_subparsers(dest='command', required=True)
@@ -229,8 +241,13 @@ def build_parser() -> argparse.ArgumentParser:
     render_parser.add_argument('--backend', required=True)
     render_parser.add_argument('--input', type=Path, required=True)
     render_parser.add_argument('--output', type=Path, required=True)
-    render_parser.add_argument('--cache-dir', type=Path, required=True)
+    render_parser.add_argument('--cache-dir', type=Path)
+    render_parser.add_argument('--consume-request', action='store_true')
     render_parser.set_defaults(func=render_request)
+
+    cleanup_parser = subparsers.add_parser('cleanup', help='remove the shell bridge scratch pair')
+    cleanup_parser.add_argument('--jobname', required=True)
+    cleanup_parser.set_defaults(func=cleanup_shell)
 
     preprocess_parser = subparsers.add_parser(
         'preprocess', help='prepare content-addressed responses before XeLaTeX'
@@ -261,6 +278,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if hasattr(sys.stderr, 'reconfigure'):
             sys.stderr.reconfigure(encoding='utf-8', errors='backslashreplace')
         parser.exit(2, f'xsr-render: [{code}] {detail}\n')
+    finally:
+        if args.command == 'render' and args.consume_request:
+            args.input.unlink(missing_ok=True)
 
 
 if __name__ == '__main__':

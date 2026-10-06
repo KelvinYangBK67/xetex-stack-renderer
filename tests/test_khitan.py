@@ -171,7 +171,7 @@ def test_preprocess_discovers_script_fonts_and_gap(tmp_path):
         + fr'\xsrKhitanText{{{A} {B}}}', encoding='utf-8')
     assert main(['preprocess', '--input', str(source),
                  '--output-dir', str(tmp_path)]) == 0
-    manifest = json.loads((tmp_path/'mixed.xsr-manifest.json').read_text(encoding='utf-8'))
+    manifest = json.loads((tmp_path / '.xsr/mixed.manifest.json').read_text(encoding='utf-8'))
     assert {run['script'] for run in manifest['runs']} == {'egyptian', 'khitan'}
     assert {run['options'].get('cluster_gap') for run in manifest['runs']
             if run['script'] == 'khitan'} == {0.2, 0.35}
