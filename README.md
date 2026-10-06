@@ -1,8 +1,10 @@
 # xetex-stack-renderer
 
-XSR **0.8** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
+XSR **0.9** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
 frontend dispatches complete script runs to registered backends. Egyptian
-Hieroglyphs and Khitan Small Script have independent backends.
+Hieroglyphs and Khitan Small Script have independent font-backed backends.
+Direct SVG and optional external providers share a generic vector layer.
+KAGE is an optional external producer, never an XSR dependency.
 
 ## Install and use
 
@@ -38,7 +40,195 @@ contain `"`, `{`, `}`, `%`, `#`, `[` or `]`, NUL or line breaks. Font commands t
 literal paths, not macro expressions. Paths cross the TeX/Python boundary as
 Unicode codepoint lists rather than interpolated JSON strings.
 
-## Khitan Small Script (new in 0.8)
+## External vector glyphs (0.9)
+
+The three layers are deliberately separate:
+
+1. Font-backed measurement and script layout: Egyptian and Khitan.
+2. Generic geometry: imported SVG and synthetic missing-glyph boxes.
+3. Optional external producer invocation: a generic provider, with a thin
+   KAGE-facing TeX convenience API. No stroke/component engine lives in XSR.
+
+### Direct SVG
+
+```tex
+\usepackage[mode=shell]{xetex-stack-renderer}
+\begin{document}
+Before \xsrVectorGlyph{assets/my-glyph.svg} after.
+\end{document}
+```
+
+Compile with `xelatex -shell-escape document.tex`. No font selection is needed
+for vector-only use. Unicode filenames and spaces work; use literal forward
+slashes. Relative SVG and configuration paths resolve from the **XeLaTeX working
+directory**, also used by preprocess (`--tex-workdir`, default `--output-dir`).
+Paths must not contain TeX reserved characters, backslashes, NUL or line breaks;
+use plain filenames rather than macro expansions or TeX escaping.
+
+The SVG design space is its `viewBox`, or numeric `width` and `height` if no
+viewBox exists. One design-space height maps to 1em; aspect ratio is preserved.
+A 200 x 200 asset has advance 1em, height 1em, depth zero and a bottom baseline.
+Ink bounds never rescale a glyph. The SVG y axis is inverted into TeX's y-up
+geometry. These are glyph metrics, not browser viewport layout: when viewBox
+exists it defines the design space independently of the physical viewport size.
+Outlines are not clipped to the design cell. Glyph objects retain design size,
+normalized advance/height/depth, bounds, commands and affine transforms, not XML.
+
+Output is PGF path geometry in PDF. There is no rasterization, Inkscape,
+LaTeX `svg` package, intermediate image/PDF or invented Unicode/PUA mapping.
+
+### Restricted SVG contract
+
+Supported UTF-8 SVG elements are `svg`, nested `g`, and `path` only. A rectangle
+must be written as a path; the `rect` element is intentionally unsupported.
+
+- Container: positive numeric/px `width` and `height`; arbitrary positive
+  `viewBox` dimensions and nonzero origins; optional SVG namespace and version.
+- Paths: `M/m L/l H/h V/v Q/q C/c Z/z`, repeated arguments, implicit line-to
+  after move-to, decimals, signs and exponent notation. Quadratics become exact
+  cubics using the two-thirds control-point conversion.
+- Transforms: `translate`, `rotate` (optionally about a center), `scale` and
+  six-number `matrix`, including transform lists and nested groups.
+- Paint: black (`black`, `#000`, `#000000`) or `none` fill/stroke, inherited
+  through groups, numeric nonnegative `stroke-width`. Default nonzero fill,
+  butt caps, miter joins and miter limit 4. Canvas transforms also transform
+  stroke geometry. Fill bounds use exact Bezier extrema; stroke bounds are
+  conservative miter bounds. `id` is accepted as inert metadata.
+
+Everything else is rejected with `XSR-SVG-INVALID`, including unsupported path
+commands, CSS/style attributes, opacity, text, scripts, images, references,
+URLs, gradients, filters, masks, clipping, animation and foreign namespaces.
+DTD/entity declarations and processing instructions are rejected before the
+standard-library XML parser sees them. The parser has no external resolver.
+There is a 2 MB asset limit, a 64-level nesting limit, and finite-coordinate
+checks. This is a glyph importer, not general SVG or a browser.
+
+### Optional provider and KAGE frontend
+
+Already have a KAGE-compatible environment? Supply an executable wrapper that
+accepts this implementation-independent protocol:
+
+```text
+xsr-kage-provider --glyph IDENTIFIER --style serif --output /temporary/glyph.svg
+```
+
+On success, exit 0 and write valid SVG to the requested absolute output path.
+Return nonzero on failure. Optional exit status 3 means the glyph was not found;
+exit 0 without a nonempty SVG is also classified as missing. The producer can be
+Python, Node, a compiled program, or a wrapper around any installed engine.
+XSR neither installs an engine nor downloads/manages GlyphWiki datasets.
+
+Create a local `provider.json`:
+
+```json
+{
+  "executable": "xsr-kage-provider",
+  "prefix_args": [],
+  "metadata": {"engine_version": "your-version", "dataset_version": "your-revision"},
+  "timeout": 30
+}
+```
+
+Only `executable` is required. A bare executable name is searched on PATH;
+a relative executable containing a slash is resolved against the configuration
+file. For an interpreter-based wrapper, set `executable` to its absolute path
+and `prefix_args` to an array containing the absolute wrapper path. Prefix
+arguments are literal and are not shell-parsed or implicitly path-rewritten.
+On Windows use an executable/interpreter, not a `.bat`/`.cmd` shell wrapper.
+Configuration is trusted executable selection, not a sandbox for untrusted programs.
+
+```tex
+\xsrKageProvider{provider.json}
+\xsrKageGlyph{glyphwiki-name}             % default serif
+{\xsrKageStyle{sans}\xsrKageGlyph{another-name}}
+```
+
+The generic equivalents are `\xsrVectorProvider{provider.json}`,
+`\xsrVectorStyle{literal-style}` and `\xsrProviderGlyph{identifier}`.
+KAGE convenience commands delegate to these; they know no KAGE API.
+KAGE styles are `serif` and `sans`; generic TeX styles use letters, digits,
+underscores or hyphens. Literal glyph identifiers may contain Unicode. Strings
+cross the request bridge as codepoints, never as interpolated shell syntax.
+Python invokes `subprocess.run(argv, shell=False)` with a timeout (default
+30 seconds, configurable up to 300). No shell command string or pipeline is parsed.
+An optional configuration `options` object is transported as a single
+`--options-json JSON` argument; omit it for the minimal three-argument protocol.
+Optional engine/dataset metadata is retained without being required or guessed.
+
+The shortest workflow is: install/configure your engine independently, provide
+its wrapper and JSON configuration, request a glyph, let the wrapper emit SVG,
+and let XSR import/cache/draw it. No KAGE wrapper or implementation is shipped
+in the MIT runtime. The committed test producer emits original geometric
+shapes only and is explicitly **not KAGE**.
+
+### Preprocessing and cache identity
+
+```text
+python -m xsr.renderer preprocess --input document.tex --output-dir build --tex-workdir .
+xelatex -no-shell-escape -output-directory=build document.tex
+```
+
+Preprocess discovers literal direct/provider/KAGE commands, follows literal
+input/include files, and tracks brace-scoped provider/style/policy selections.
+Each unique provider request is generated once; responses are content-addressed
+and final TeX compilation invokes no provider. Keep the local SVG/configuration
+files available for their content checks. Changing either requires preprocessing
+again. Arbitrary macro expansion, conditionals and dynamically assembled commands
+are outside the conservative source discoverer's scope. Existing font discovery
+still prepares the cross-product of discovered fonts and backend options.
+
+Direct SVG cache identity includes normalized absolute source path, content MD5
+(for the TeX bridge), authoritative content SHA-256, importer/backend version,
+and rendering options. Provider identity includes executable/prefix arguments,
+configuration/options/metadata, identifier, style, resulting SVG SHA-256 and
+importer version. Cached SVG remains interchange and is revalidated on import;
+the final response contains PGF geometry. Provider records retain the content
+digest and metadata next to cached SVG. A result digest is never inferred from
+an identifier alone.
+
+In shell mode the first glyph calls the provider, imports SVG and caches the
+response. Repeated requests in the same document reuse the response without
+starting another provider. Successful producer results persist across builds.
+Provider failures are not stored as successful SVG; their typed fallback
+responses can still be reused within the TeX document. Change the configuration
+metadata revision or remove the provider cache when the engine/dataset changes.
+The provider cannot reveal changes to its environment unless its configured
+identity changes. The `obtain_many` abstraction leaves future batch invocation
+open; 0.9 invokes one process per unique uncached request.
+
+### Missing-glyph policy
+
+```tex
+\xsrMissingGlyphPolicy{box}   % default; scoped by TeX groups
+\xsrMissingGlyphPolicy{error} % strict
+```
+
+Python options use `missing_glyph_policy='box'` or `'error'`. A missing visible
+font glyph is replaced by a generic hollow compound vector path and emits
+`XSR-GLYPH-MISSING`. Both backends use a nominal 1em square in normalized font
+units; KSS centers it in the normal slot, and Egyptian H/V packing applies the
+same scaling/padding as for other signs. Missing shapes are never guessed.
+KSS U+16FE4/SPACE/ZWSP and Egyptian controls/variation selectors never become
+tofu, because only parser-selected visible signs request glyph metrics.
+An empty outline keeps its existing distinct `XSR-GLYPH-EMPTY` error.
+
+External fallback warnings distinguish `XSR-PROVIDER-UNAVAILABLE`,
+`XSR-PROVIDER-MISSING`, `XSR-PROVIDER-FAILED`, and `XSR-PROVIDER-SVG`.
+Under `box`, each draws a nominal 1em placeholder; under `error`, each fails.
+Malformed direct SVG always fails. Invalid provider configuration always fails.
+The Python warning has a typed `XSRWarning.code`, and cached TeX responses also
+log the warning. The selected font's `.notdef` or a Unicode box is never used.
+
+See the [three-page vector/provider showcase](examples/vector-showcase.pdf),
+its [source](examples/vector-showcase.tex), and [0.9 verification](docs/v0.9-verification.md).
+Rebuild it with `python scripts/build_vector_showcase.py` after fetching the two
+Noto reference fonts. Real KAGE is neither used nor required for the showcase or CI.
+
+Intentional non-goals: KAGE stroke/component algorithms, GlyphWiki downloading,
+IDS/Han synthesis, font-style fitting, font export, PUA mappings, vertical-flow
+changes, general SVG, raster fallback, and automatic provider environment management.
+
+## Khitan Small Script
 
 Select an explicit static Unicode outline font. The same file supplies Python
 metrics and XeTeX glyphs:
@@ -62,7 +252,7 @@ the first sign, then places the remaining signs in left/right pairs, again
 centering a final odd sign. Text order is left to right, then top to bottom.
 The iteration mark U+18B00 is a sign in the stack; its repetition meaning is
 not drawn as a duplicate. U+18CFF is accepted as an unidentified/missing sign
-when the selected font provides an outline. Unassigned codepoints and malformed
+with the selected outline, or a synthetic missing-glyph box when it is absent. Unassigned codepoints and malformed
 filler/separators fail with typed Khitan diagnostics. Unicode describes typical
 phonograms of two to eight signs, with single-sign units also possible;
 the implementation does not impose a smaller arbitrary length limit.
@@ -91,9 +281,9 @@ ad6d20d17e7b0af746106b8e0e3ac65c47f6813a4acb6e05786023e1374a953f.
 No font binary is committed. The optional Linear font file used for the
 committed comparison page has SHA-256
 E5DEA2755975D4BAAFA3DAF5E6A695C1338F3298B3836B07EE39FD1E61B7BC95.
-The official Noto font lacks U+18CFF, so an
-attempt to render that sign with this particular file yields
-XSR-GLYPH-MISSING; a font with its outline can render it.
+The official Noto v1.000 font lacks U+18CFF. XSR 0.9 renders a synthetic
+1em hollow box in its normal KSS slot and logs `XSR-GLYPH-MISSING`.
+The strict `error` policy raises instead; a font with an outline uses that outline.
 
 Unicode sources for these rules are [Unicode 18 chapter 18, section 18.12](https://www.unicode.org/versions/Unicode18.0.0/core-spec/chapter-18/),
 the [Unicode 18 names list for U+18B00..U+18CFF](https://www.unicode.org/Public/18.0.0/charts/nameslist/18b00/),
@@ -316,25 +506,27 @@ python scripts/fetch_noto.py
 python scripts/fetch_newgardiner.py
 python scripts/fetch_khitan.py
 python -m pytest
-python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py
+python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py tests/test_vector_tex.py
 python scripts/build_showcase.py --font tmp/fonts/NotoSansEgyptianHieroglyphs-Regular.ttf --font tmp/fonts/NewGardiner.ttf --font C:/Windows/Fonts/seguihis.ttf
 python scripts/check_showcase.py examples/egyptian-showcase.pdf
 python scripts/build_khitan_showcase.py --font tmp/fonts/NotoSerifKhitanSmallScript-Regular.ttf --comparison-font D:/_INBOX/Download/KhitanSmallLinear.ttf
 python scripts/check_khitan_showcase.py examples/khitan-showcase.pdf
+python scripts/build_vector_showcase.py
+python scripts/check_vector_showcase.py examples/vector-showcase.pdf
 ```
 
 The builder accepts two or three fonts and compiles in a fresh temporary directory
-without shell escape. The committed [six-page 0.7 showcase](examples/egyptian-showcase.pdf)
+without shell escape. The committed [six-page 0.9 showcase](examples/egyptian-showcase.pdf)
 and [editable source](examples/egyptian-showcase.tex) compare Noto, NewGardiner and
 Segoe UI Historic across basic layout, all seven insertion slots, overlay,
 enclosures, registered transforms, RTL, editorial brackets, continuous shading,
 paragraph wrapping and combinations. The older
-[font-metrics showcase](examples/font-metrics-showcase.pdf) is the historical 0.4 baseline.
+[font-metrics showcase](examples/font-metrics-showcase.pdf) preserves the historical 0.4 corpus, rebuilt with 0.9.
 
 [GitHub Actions](.github/workflows/ci.yml) installs the package on Ubuntu 24.04 with
 Python 3.11, focused TeX Live packages and Poppler; downloads checksum-verified Noto Egyptian, NewGardiner and Noto Khitan
 from their official repositories at runtime; verifies Hieropy is absent, runs
-all tests plus separate XeLaTeX integration, and rebuilds both showcases. Test reports, PDF and page images are artifacts, never automatic
+all tests plus separate XeLaTeX integration, and rebuilds all three current showcases. Test reports, PDF and page images are artifacts, never automatic
 commits. NewGardiner is fetched from its pinned official upstream revision; Segoe is
 optional on Windows. No external fonts are vendored. Noto can also be selected with `XSR_NOTO_FONT`; additional test
 fonts use `XSR_TEST_FONTS` (an `os.pathsep`-separated list).

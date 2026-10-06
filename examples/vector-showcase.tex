@@ -1,0 +1,78 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=23mm]{geometry}
+\usepackage{xcolor}
+\usepackage[mode=preprocess]{xetex-stack-renderer}
+\definecolor{ink}{HTML}{18354B}
+\definecolor{accent}{HTML}{267B82}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{9pt}
+\newcommand\PageTitle[1]{{\color{ink}\LARGE\bfseries XSR 0.9 / External vectors}\par
+  {\color{accent}\large #1}\par\medskip\hrule\medskip}
+\newcommand\Sample[2]{\par\medskip\textbf{#1}\par\medskip {\fontsize{30}{40}\selectfont #2}\par\medskip}
+\input{vector-showcase-config}
+\begin{document}
+\PageTitle{1. SVG is an interchange format}
+An external glyph is an explicit vector object. XSR imports its paths into
+its own geometry and draws them with PGF. No raster image, embedded PDF,
+font encoding or private-use character is created.
+\Sample{Three synthetic designs}{\xsrVectorGlyph{square.svg}\quad\xsrVectorGlyph{curve.svg}\quad\xsrVectorGlyph{diamond.svg}}
+The square, curved form and diamond above are tiny original SVG fixtures.
+They demonstrate multiple contours, quadratic curves and affine transforms.
+\Sample{Design space, not ink bounds}{\fbox{\xsrVectorGlyph{square.svg}}\quad\fbox{\xsrVectorGlyph{sparse.svg}}}
+Both assets have a 200 by 200 design space and the same 1em advance.
+The sparse mark stays small inside its cell; it is not enlarged to fill the box.
+\par\medskip
+\textbf{Inline baseline}\par
+Before \xsrVectorGlyph{square.svg} after. Before \xsrVectorGlyph{sparse.svg} after.
+\par\medskip
+The bottom of the default square is on the text baseline. The box has height
+1em and depth zero. A rectangular viewBox preserves its aspect ratio, using
+one design-space height per em.
+\vfill
+\small Direct API: \texttt{\string\xsrVectorGlyph\{path/to/glyph.svg\}}.
+Paths resolve from the XeLaTeX working directory. Source content joins the cache identity.
+\newpage
+\PageTitle{2. An optional external provider}
+The KAGE-facing commands below use the test suite's synthetic provider.
+They do not run KAGE and are not examples of KAGE stroke rendering.
+The same protocol can connect an independently installed KAGE-compatible wrapper.
+\Sample{Default serif option}{\xsrKageGlyph{test-glyph}\quad\xsrKageGlyph{second}}
+{\xsrKageStyle{sans}
+\Sample{Sans option}{\xsrKageGlyph{test-glyph}\quad\xsrKageGlyph{second}}}
+The synthetic producer changes a bar thickness to make style transport visible.
+An actual external producer decides how to interpret its style option.
+\Sample{Repeated request}{\xsrKageGlyph{test-glyph}\quad\xsrKageGlyph{test-glyph}\quad\xsrKageGlyph{test-glyph}}
+One unique glyph/style/configuration is generated once and reused. The provider
+writes SVG; XSR validates it and caches the normalized vector response.
+\par\medskip
+\textbf{Protocol}\par
+\texttt{provider --glyph ID --style STYLE --output PATH}
+\par
+The executable and prefix arguments come from a local JSON configuration.
+Python invokes an argument array with shell processing disabled.
+\vfill
+\small This PDF was prepared before compilation, then built with
+\texttt{xelatex -no-shell-escape}. Final compilation invokes no provider.
+\newpage
+\PageTitle{3. Missing glyphs remain visible}
+The default missing-glyph policy is \texttt{box}. XSR draws a hollow vector
+rectangle in the backend's nominal cell and logs a typed warning.
+The selected font's missing-glyph symbol is never used.
+\Sample{Khitan: Noto v1.000 lacks U+18CFF}{\xsrKhitanText{𘬁𘳿}}
+The second cell is synthetic. The original two-column stack stays intact.
+Filler U+16FE4, SPACE and ZWSP remain controls or separators, never boxes.
+\Sample{Egyptian: Noto lacks visible sign U+1342F}{\xsrEgyptianText{𓀀𓐱𓐯}}
+The normal sign and missing sign still participate in horizontal composition.
+Egyptian controls and variation selectors do not request glyph cells.
+\Sample{External provider: no requested glyph}{\xsrKageGlyph{missing}}
+This fixture returns the documented missing-glyph status. Unavailable providers,
+provider failures and invalid SVG have separate diagnostic codes.
+\par\medskip
+\textbf{Strict mode}\par
+\texttt{\string\xsrMissingGlyphPolicy\{error\}} makes missing glyphs fatal.
+The normal default can be restored with \texttt{box}. Malformed direct SVG
+always raises a typed error; it is not silently replaced.
+\vfill
+\small The synthetic geometry does not guess an absent historical shape.
+No KAGE implementation, GlyphWiki dataset or external font is bundled with XSR.
+\end{document}

@@ -1,11 +1,12 @@
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesExplPackage
   {xsr-egyptian}
-  {2026-10-05}
-  {0.8}
+  {2026-10-06}
+  {0.9}
   {Egyptian backend registration for xetex-stack-renderer}
 
 \RequirePackage{xsr-core}
+\RequirePackage{xsr-vector}
 \RequirePackage{graphicx}
 \RequirePackage{pgf}
 
@@ -91,6 +92,7 @@
           \str_if_eq:VnT \l_xsr_egyptian_direction_tl {rtl} {"direction":"rtl",}
           "font_codepoints":"\l_xsr_egyptian_font_codepoints_tl",
           "font_digest":"\l_xsr_egyptian_font_digest_tl"
+          \str_if_eq:VnT \l_xsr_missing_policy_tl {error} {,"missing_glyph_policy":"error"}
           \c_right_brace_str
         }
       \xsr_external_render:nn {#1} {#2}
@@ -114,7 +116,7 @@
 
 \xsr_register_backend:nnn
   { egyptian }
-  { font-aware-ehfc-0.7 }
+  { font-aware-ehfc-0.9 }
   { xsr_egyptian_render:nn }
 
 % Top-origin ink positions. Subtract the actual left bearing and place the
@@ -184,6 +186,16 @@
       { 13000-1342F, 13430-1345F, 13460-143FF }
     \xsr_active_detector_register_suffix:nnn {egyptian}{"FE00}{"FE0F}
   }
+
+\NewDocumentCommand \xsrEgyptianSynthetic {m m m m}
+  {\xsrVectorWarning{XSR-GLYPH-MISSING}
+   \pgfscope
+    \dim_set_eq:NN\l_xsr_vector_em_dim\l_xsr_egyptian_em_dim
+    \pgftransformshift{\pgfpoint{#2\l_xsr_egyptian_em_dim}
+      {\dim_eval:n{\l_xsr_egyptian_layout_height_dim-#3\l_xsr_egyptian_em_dim}}}
+    \xsr_egyptian_matrix:w #4\q_stop
+    #1
+   \endpgfscope}
 
 \ExplSyntaxOff
 

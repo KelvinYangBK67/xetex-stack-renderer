@@ -115,6 +115,9 @@ class Renderer:
         prepare = getattr(backend, 'prepare_options', None)
         if prepare is not None:
             normalized_options = prepare(normalized_options)
+        prepare_request = getattr(backend, 'prepare_request', None)
+        if prepare_request is not None:
+            normalized_options = prepare_request(text, normalized_options)
         key = RenderCache.key(backend.name, backend.version, text, normalized_options)
         if self.cache is not None:
             cached = self.cache.get(key)
@@ -134,6 +137,9 @@ def default_renderer(cache_dir: str | Path | None = None) -> Renderer:
     renderer = Renderer(RenderCache(cache_dir) if cache_dir is not None else None)
     renderer.register(EgyptianBackend())
     renderer.register(KhitanBackend())
+    from .vector_backend import VectorBackend
+    renderer.register(VectorBackend('vector', cache_dir or '.xsr-cache'))
+    renderer.register(VectorBackend('provider', cache_dir or '.xsr-cache'))
     return renderer
 
 

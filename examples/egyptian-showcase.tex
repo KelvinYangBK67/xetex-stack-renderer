@@ -19,7 +19,7 @@
   \newcommand\samplerow[3]{#1\par{\scriptsize\ttfamily #2} & \sample{\FontOne}{#3} & \sample{\FontTwo}{#3}\\[15pt]}
 \fi
 \begin{document}
-{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.7}\par\smallskip
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.9}\par\smallskip
 {\large 01 / Signs and composition}\par\medskip
 Natural outline proportions, centered H/V groups and stable nesting.\par\medskip
 \begin{comparison}\tablehead
@@ -33,7 +33,7 @@ Natural outline proportions, centered H/V groups and stable nesting.\par\medskip
 \end{comparison}\vfill
 {\small\color{ink}\textbf{Inspection notes}}\par\smallskip\small Identical Unicode in every column. Frames show the computed layout extent. H = U+13431; V = U+13430. Parentheses describe the structure, not literal punctuation.
 \newpage
-{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.7}\par\smallskip
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.9}\par\smallskip
 {\large 02 / Outline-aware insertion}\par\medskip
 Each inset is placed in a measured empty region of the host outline.\par\medskip
 \begin{comparison}\tablehead
@@ -47,7 +47,7 @@ Each inset is placed in a measured empty region of the host outline.\par\medskip
 \end{comparison}\vfill
 {\small\color{ink}\textbf{Inspection notes}}\par\smallskip\small Inset locations come from scan-converted outlines with a collision margin. Shapes with no usable cavity fail explicitly; no font-specific insertion coordinates or alternate glyph recipes are used.
 \newpage
-{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.7}\par\smallskip
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.9}\par\smallskip
 {\large 03 / Overlays and enclosures}\par\medskip
 Overlays share ink centers. Vector enclosures grow around actual content.\par\medskip
 \begin{comparison}\tablehead
@@ -61,7 +61,7 @@ Overlays share ink centers. Vector enclosures grow around actual content.\par\me
 \end{comparison}\vfill
 {\small\color{ink}\textbf{Inspection notes}}\par\smallskip\small Common cartouche, rectangular and walled end pairs are drawn by XSR. Missing end delimiters leave that end open. Overlay overlap is intentional. Alternate endpoints use outlines from the selected font; common ends remain vectors.
 \newpage
-{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.7}\par\smallskip
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.9}\par\smallskip
 {\large 04 / Transforms, damage and combinations}\par\medskip
 Rotation precedes mirroring. Hatching marks damaged or missing text.\par\medskip
 \begin{comparison}\tablehead
@@ -79,7 +79,7 @@ Rotation precedes mirroring. Hatching marks damaged or missing text.\par\medskip
 
 
 \newpage
-{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.7}\par\smallskip
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.9}\par\smallskip
 {\large 05 / Standardized rotation and horizontal RTL}\par\medskip
 The same selector means different angles for different signs. RTL reverses logical start/end.\par\medskip
 \begin{comparison}\tablehead
@@ -95,7 +95,7 @@ The same selector means different angles for different signs. RTL reverses logic
 \end{comparison}\vfill
 {\small\color{ink}\textbf{Semantic policy}}\par\smallskip\small Unicode 18 standardized variants determine angles. Explicit NoMirror violations and unregistered NoRotate variants are errors. Registered angle-specific variants take precedence over the broad NoRotate property. Full vertical text flow is reserved; V JOINER within a quadrat remains supported.
 \newpage
-{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.7}\par\smallskip
+{\color{ink}\LARGE\bfseries Egyptian rendering / XSR 0.9}\par\smallskip
 {\large 06 / Editorial marks, continuous loss and line wrapping}\par\medskip
 Brackets use explicit Egyptian context; ordinary punctuation retains its normal TeX meaning.\par\medskip
 \begin{comparison}\tablehead

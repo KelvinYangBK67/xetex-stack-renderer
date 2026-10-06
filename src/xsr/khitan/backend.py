@@ -4,11 +4,13 @@ import hashlib
 import re
 from typing import Mapping
 from ..errors import XSRError
+from ..synthetic import FallbackFont, policy
+from ..vector import tofu, paths_tex
 from ..font_metrics import options_font, font_options, encode_path, tex_font_path
 from .parser import KhitanParser
 from .layout import KhitanLayout
 
-BACKEND_VERSION = 'native-fixed-stack-0.8'
+BACKEND_VERSION = 'native-fixed-stack-0.9'
 
 
 def number(value: float) -> str:
@@ -32,9 +34,11 @@ class KhitanBackend:
 
     def prepare_options(self, options: Mapping[str, object]) -> dict[str, object]:
         self._mode(options)
-        font = options_font(options)
+        font = FallbackFont(options_font(options), policy(options))
         gap = self._gap(options)
         result = font_options(font.path)
+        if policy(options) != 'box':
+            result['missing_glyph_policy'] = policy(options)
         if gap != 0.2:
             result['cluster_gap'] = gap
         return result
@@ -43,7 +47,7 @@ class KhitanBackend:
     def _mode(options: Mapping[str, object]) -> None:
         if options.get('writing_mode', 'horizontal') != 'horizontal':
             raise XSRError('XSR-WRITING-MODE-UNSUPPORTED',
-                           'Khitan 0.8 supports horizontal host text only')
+                           'Khitan supports horizontal host text only')
 
     @staticmethod
     def _gap(options: Mapping[str, object]) -> float:
@@ -58,7 +62,7 @@ class KhitanBackend:
 
     def render(self, text: str, options: Mapping[str, object]) -> str:
         self._mode(options)
-        font = options_font(options)
+        font = FallbackFont(options_font(options), policy(options))
         tex_font_path(font.path)
         gap = self._gap(options)
         parsed = self.parser.parse(text)
@@ -69,7 +73,8 @@ class KhitanBackend:
                 pieces.append(r'\xsrKhitanBreak{' + (number(gap) if parsed.separators[index - 1] == 'space' else '0') + '}')
             box = layout.cluster(cluster)
             glyphs = ''.join(
-                r'\xsrKhitanGlyph{' + f'{g.codepoint:X}' + '}' +
+                (r'\xsrKhitanSynthetic{' + paths_tex(tofu()) + '}' if g.codepoint in font.missing
+                 else r'\xsrKhitanGlyph{' + f'{g.codepoint:X}' + '}') +
                 ''.join('{' + number(v) + '}' for v in
                         (g.x, g.y, g.ink_left, g.ink_top))
                 for g in box.glyphs)
@@ -79,4 +84,4 @@ class KhitanBackend:
         digest = hashlib.sha256(text.encode('utf-8')).hexdigest()[:12]
         body = r'\xsrKhitanUseFont{' + encode_path(tex_font_path(font.path)) + '}{' + font.digest + '}{' + ''.join(pieces) + '}'
         return (r'\xsrBackendLayoutResult{khitan}{' + str(len(text)) + '}{' + digest +
-                '}{' + self.version + '}{xsr-native-0.8}{' + body + '}%\n')
+                '}{' + self.version + '}{xsr-native-' + self.parser.parser_version + '}{' + body + '}%\n')

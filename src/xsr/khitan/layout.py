@@ -1,4 +1,5 @@
 """Fixed KSS stack slots with unscaled, ink-centred selected-font glyphs."""
+from ..synthetic import FallbackFont
 from .model import KhitanCluster, KhitanPlacement, KhitanRenderResult
 
 
@@ -21,7 +22,7 @@ def slots(cluster: KhitanCluster) -> tuple[tuple[int, int], ...]:
 
 class KhitanLayout:
     def __init__(self, font):
-        self.font = font
+        self.font = font if isinstance(font, FallbackFont) else FallbackFont(font)
 
     def cluster(self, cluster: KhitanCluster) -> KhitanRenderResult:
         metrics = [self.font.glyph(cp) for cp in cluster.characters]

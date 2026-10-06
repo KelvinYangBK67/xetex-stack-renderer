@@ -93,14 +93,24 @@ def preprocess(args):
             render_options = font_options(resolved)
             profiles[script].extend((options | extra, render_options | extra)
                                     for extra in extras)
+    from .policy_scopes import policy_spans
+    policies = policy_spans(sources)
     runs, emitted = [], set()
+    from .vector_preprocess import COMMAND as vector_command
     for path, (raw, source) in sources.items():
-        for run in source_runs(source, registry):
+        # External identifiers and asset paths are data, not font-backed text.
+        script_source = vector_command.sub(lambda match: ' ' * len(match.group()), source)
+        for run in source_runs(script_source, registry):
             if not profiles[run.script]:
                 raise XSRError('XSR-FONT-NOT-SELECTED',
                                f'select a {run.script} font in the source or supply --font')
             version = renderer.backend_version(run.script)
-            for options, render_options in profiles[run.script]:
+            active_policies = {value for start, end, value in policies[path] if start <= run.start < end}
+            variants = [(options | extra, render_options | extra)
+                        for options, render_options in profiles[run.script]
+                        for value in sorted(active_policies or {'box'})
+                        for extra in ([{'missing_glyph_policy': value}] if value == 'error' else [{}])]
+            for options, render_options in variants:
                 digest = request_digest(run.script, version, run.text, options)
                 filename = response_filename(jobname, run.script, version, run.text, options)
                 if digest not in emitted:
@@ -112,6 +122,8 @@ def preprocess(args):
                                  start=run.start, end=run.end,
                                  codepoints=[f'{ord(ch):X}' for ch in run.text],
                                  response=filename))
+    from .vector_preprocess import prepare_vectors
+    runs.extend(prepare_vectors(sources, workdir, output_dir, jobname, renderer))
     manifest = dict(format='XSR-PREPROCESS-2', source=str(inputs[0]),
                     source_sha256=hashlib.sha256(sources[inputs[0].resolve()][0].encode('utf-8')).hexdigest(),
                     sources=[dict(path=str(p), sha256=hashlib.sha256(raw.encode('utf-8')).hexdigest())

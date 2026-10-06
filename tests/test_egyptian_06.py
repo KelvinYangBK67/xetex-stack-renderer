@@ -90,8 +90,13 @@ def test_enclosure_endpoints(font,direction,pair):
     walled=a==0x13288
     seq=([a,0x13447] if a else [])+[0x1343E if walled else 0x1343C,0x13000,0x1343F if walled else 0x1343D]+([b,0x13455] if b else [])
     if a==0x1342F and a not in font._cmap:
+        from xsr.synthetic import FallbackFont, XSRWarning
         with pytest.raises(ValueError,match='XSR-GLYPH-MISSING'):
-            EgyptianParser().layout(text(*seq),font,direction=direction)
+            EgyptianParser().layout(text(*seq),FallbackFont(font, 'error'),direction=direction)
+        with pytest.warns(XSRWarning, match='XSR-GLYPH-MISSING'):
+            fallback = EgyptianParser().layout(text(*seq),font,direction=direction)
+        contained(fallback)
+        assert len(fallback.glyphs) == 3
         return
     r=EgyptianParser().layout(text(*seq),font,direction=direction)
     contained(r)

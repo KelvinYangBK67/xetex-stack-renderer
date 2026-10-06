@@ -3,7 +3,7 @@
 from .registry import Registry
 
 __all__ = ['Registry', 'build_default_registry']
-__version__ = '0.8'
+__version__ = '0.9'
 
 
 def build_default_registry() -> Registry:

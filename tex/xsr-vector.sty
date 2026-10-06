@@ -1,0 +1,104 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesExplPackage{xsr-vector}{2026-10-06}{0.9}{External vector glyphs and synthetic geometry}
+\RequirePackage{xsr-core}
+\RequirePackage{pgf}
+\ExplSyntaxOn
+\tl_new:N \l_xsr_missing_policy_tl
+\tl_set:Nn \l_xsr_missing_policy_tl {box}
+\msg_new:nnn{xsr-vector}{policy}{[XSR-MISSING-POLICY]~Use~box~or~error.}
+\msg_new:nnn{xsr-vector}{literal}{[XSR-VECTOR-LITERAL]~Use~a~literal~argument.}
+\msg_new:nnn{xsr-vector}{missing}{[XSR-SVG-MISSING]~Input~file~is~missing.}
+\msg_new:nnn{xsr-vector}{fallback}{[#1]~Using~a~synthetic~missing-glyph~box.}
+\NewDocumentCommand \xsrMissingGlyphPolicy {m}
+  {\str_case:nnF{#1}{{box}{\tl_set:Nn\l_xsr_missing_policy_tl{box}}
+    {error}{\tl_set:Nn\l_xsr_missing_policy_tl{error}}}{\msg_fatal:nn{xsr-vector}{policy}}}
+\NewDocumentCommand \xsrVectorWarning {m}{\msg_warning:nnn{xsr-vector}{fallback}{#1}}
+\dim_new:N \l_xsr_vector_em_dim
+\NewDocumentCommand \xsrVectorPoint {m m}
+  {\pgfpoint{#1\l_xsr_vector_em_dim}{#2\l_xsr_vector_em_dim}}
+\NewDocumentCommand \xsrVectorPath {m m m m m m m m m}
+  {\pgfscope
+    \pgftransformcm{#1}{#2}{#3}{#4}{\xsrVectorPoint{#5}{#6}}
+    \pgflowlevelsynccm
+    \pgfsetfillcolor{black}\pgfsetstrokecolor{black}
+    \pgfsetnonzerorule\pgfsetbuttcap\pgfsetmiterjoin\pgfsetmiterlimit{4}
+    \pgfsetlinewidth{#7\l_xsr_vector_em_dim}
+    #9\pgfusepath{#8}
+   \endpgfscope}
+\NewDocumentCommand \xsrVectorBox {m m m m}
+  {\group_begin:
+    \dim_set:Nn\l_xsr_vector_em_dim{\f@size pt}
+    \iow_term:x{XSR-LAYOUT~script=vector~width=#1~height=#2~depth=#3}
+    \mode_leave_vertical:
+    \hbox{\pgfpicture
+      \pgfsetbaseline{0pt}
+      \pgfpathrectangle{\xsrVectorPoint{0}{-#3}}
+        {\xsrVectorPoint{#1}{\fp_eval:n{#2+#3}}}
+      \pgfusepath{use~as~bounding~box}
+      \pgfinterruptboundingbox #4\endpgfinterruptboundingbox
+    \endpgfpicture}
+   \group_end:}
+\tl_new:N \l_xsr_vector_provider_tl
+\tl_new:N \l_xsr_vector_style_tl
+\tl_set:Nn\l_xsr_vector_style_tl{serif}
+\tl_new:N \l_xsr_vector_codes_tl
+\tl_new:N \l_xsr_vector_digest_tl
+\tl_new:N \l_xsr_vector_path_tl
+\prop_new:N \g_xsr_vector_seen_prop
+\cs_generate_variant:Nn\file_mdfive_hash:n{V}
+\cs_generate_variant:Nn\str_map_inline:nn{Vn}
+\cs_new_protected:Npn\xsr_vector_literal:n #1
+  {\regex_match:nnT{[\x{0000}\x{000A}\x{000D}\\\{\}\%\#]}{#1}
+    {\msg_fatal:nn{xsr-vector}{literal}}}
+\cs_new_protected:Npn\xsr_vector_encode:n #1
+  {\tl_clear:N\l_xsr_vector_codes_tl
+   \str_map_inline:nn{#1}{\tl_put_right:Nx\l_xsr_vector_codes_tl{\int_to_Hex:n{`##1},}}
+   \tl_set:Nx\l_xsr_vector_codes_tl{\tl_range:Nnn\l_xsr_vector_codes_tl{1}{-2}}}
+\NewDocumentCommand \xsrVectorProvider {m}
+  {\xsr_vector_literal:n{#1}\tl_set:Nn\l_xsr_vector_provider_tl{#1}}
+\NewDocumentCommand \xsrKageProvider {m}{\xsrVectorProvider{#1}}
+\NewDocumentCommand \xsrVectorStyle {m}
+  {\regex_match:nnTF{\A[A-Za-z0-9_-]+\Z}{#1}
+    {\tl_set:Nn\l_xsr_vector_style_tl{#1}}{\msg_fatal:nn{xsr-vector}{literal}}}
+\NewDocumentCommand \xsrKageStyle {m}
+  {\str_case:nnF{#1}{{serif}{\xsrVectorStyle{serif}}{sans}{\xsrVectorStyle{sans}}}
+    {\msg_fatal:nn{xsr-vector}{literal}}}
+\cs_new_protected:Npn\xsr_vector_request:nn #1#2
+  {\xsr_prepare_request:nn{#1}{#2}
+   \prop_if_in:NVTF\g_xsr_vector_seen_prop\l_xsr_request_digest_tl
+    {\xsr_input_response:}
+    {\xsr_external_render:nn{#1}{#2}
+     \bool_if:NT\l_xsr_response_valid_bool
+      {\prop_gput:NVn\g_xsr_vector_seen_prop\l_xsr_request_digest_tl{1}}}}
+\NewDocumentCommand \xsrVectorGlyph {m}
+  {\group_begin:
+    \xsr_vector_literal:n{#1}
+    \xsr_vector_encode:n{#1}
+    \tl_set:Nn\l_xsr_vector_path_tl{#1}
+    \tl_set:Nx\l_xsr_vector_digest_tl{\file_mdfive_hash:V\l_xsr_vector_path_tl}
+    \tl_if_empty:NT\l_xsr_vector_digest_tl{\msg_fatal:nn{xsr-vector}{missing}}
+    \tl_set:Nx\g_xsr_renderer_options_tl
+      {\c_left_brace_str
+       "source_codepoints":"\l_xsr_vector_codes_tl","source_digest":"\l_xsr_vector_digest_tl"
+       \c_right_brace_str}
+    \xsr_vector_request:nn{vector}{}
+   \group_end:}
+\NewDocumentCommand \xsrProviderGlyph {m}
+  {\group_begin:
+    \xsr_vector_literal:n{#1}
+    \exp_args:NV\xsr_vector_encode:n\l_xsr_vector_provider_tl
+    \tl_set:Nx\l_xsr_vector_digest_tl{\file_mdfive_hash:V\l_xsr_vector_provider_tl}
+    \tl_set:Nx\g_xsr_renderer_options_tl
+      {\c_left_brace_str
+       "missing_glyph_policy":"\l_xsr_missing_policy_tl",
+       "provider_codepoints":"\l_xsr_vector_codes_tl",
+       "provider_digest":"\l_xsr_vector_digest_tl",
+       "style":"\l_xsr_vector_style_tl"
+       \c_right_brace_str}
+    \exp_args:Nnx\xsr_vector_request:nn{provider}{\tl_to_str:n{#1}}
+   \group_end:}
+\NewDocumentCommand \xsrKageGlyph {m}{\xsrProviderGlyph{#1}}
+\xsr_register_backend:nnn{vector}{vector-0.9}{xsr_vector_request:nn}
+\xsr_register_backend:nnn{provider}{vector-0.9}{xsr_vector_request:nn}
+\ExplSyntaxOff
+\endinput

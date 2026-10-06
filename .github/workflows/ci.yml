@@ -45,7 +45,7 @@ jobs:
       - name: Verify Python, geometry, fonts and XeLaTeX
         run: python -m pytest -ra --junitxml=tmp/test-results.xml
       - name: Verify XeLaTeX integration separately
-        run: python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py -q
+        run: python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py tests/test_vector_tex.py -q
       - name: Rebuild visual showcase without shell escape
         shell: bash
         run: |
@@ -58,6 +58,19 @@ jobs:
           python scripts/build_khitan_showcase.py --font tmp/fonts/NotoSerifKhitanSmallScript-Regular.ttf --output tmp/ci-khitan-showcase.pdf
           python scripts/check_khitan_showcase.py tmp/ci-khitan-showcase.pdf
           pdftoppm -scale-to 1400 -png tmp/ci-khitan-showcase.pdf tmp/ci-khitan-showcase
+      - name: Rebuild vector/provider showcase without KAGE or shell escape
+        run: |
+          python scripts/build_vector_showcase.py --output tmp/ci-vector-showcase.pdf
+          python scripts/check_vector_showcase.py tmp/ci-vector-showcase.pdf
+          pdftoppm -scale-to 1400 -png tmp/ci-vector-showcase.pdf tmp/ci-vector-showcase
+      - name: Verify package and external-engine boundaries
+        run: python scripts/check_boundaries.py
+      - name: Build and install a clean wheel
+        run: |
+          python -m pip wheel . --no-deps --wheel-dir tmp/wheels
+          python -m venv tmp/wheel-env
+          tmp/wheel-env/bin/python -m pip install tmp/wheels/xetex_stack_renderer-0.9-*.whl
+          tmp/wheel-env/bin/python scripts/verify_install.py "$PWD"
       - name: Verify no external font binary is tracked
         shell: bash
         run: |
@@ -78,4 +91,7 @@ jobs:
             tmp/ci-khitan-showcase-*.png
             tmp/pdfs/khitan-showcase-build.log
             tmp/pdfs/showcase-build.log
+            tmp/ci-vector-showcase.pdf
+            tmp/ci-vector-showcase-*.png
+            tmp/pdfs/vector-showcase-build.log
           if-no-files-found: warn

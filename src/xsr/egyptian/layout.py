@@ -1,4 +1,5 @@
 """Font-derived horizontal Egyptian composition and atomic quadrat layout."""
+from ..synthetic import FallbackFont
 from dataclasses import replace
 
 from ..errors import XSRError
@@ -24,7 +25,7 @@ class EgyptianLayout:
     padding = 0.04
 
     def __init__(self, font: FontMetrics, direction='ltr'):
-        self.font = font
+        self.font = font if isinstance(font, FallbackFont) else FallbackFont(font)
         self.rtl = direction == 'rtl'
 
     @staticmethod

@@ -1,7 +1,8 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesExplPackage{xsr-khitan}{2026-10-05}{0.8}
+\ProvidesExplPackage{xsr-khitan}{2026-10-06}{0.9}
   {Native Khitan Small Script fixed-stack backend}
 \RequirePackage{xsr-core}
+\RequirePackage{xsr-vector}
 \RequirePackage{pgf}
 \ExplSyntaxOn
 
@@ -39,7 +40,7 @@
 \NewDocumentCommand \xsrKhitanClusterGap {m}
   {\tl_set:Nn \l_xsr_khitan_gap_tl {#1}}
 \msg_new:nnn{xsr-khitan}{writing-mode}
-  {[XSR-WRITING-MODE-UNSUPPORTED]~Khitan~0.8~supports~horizontal~host~text~only.}
+  {[XSR-WRITING-MODE-UNSUPPORTED]~Khitan~supports~horizontal~host~text~only.}
 \NewDocumentCommand \xsrKhitanWritingMode {m}
   {\str_if_eq:nnF{#1}{horizontal}{\msg_fatal:nn{xsr-khitan}{writing-mode}}}
 \NewDocumentCommand \xsrKhitanText {m}
@@ -72,6 +73,7 @@
           "cluster_gap":\l_xsr_khitan_gap_tl,
           "font_codepoints":"\l_xsr_khitan_font_codepoints_tl",
           "font_digest":"\l_xsr_khitan_font_digest_tl"
+          \str_if_eq:VnT \l_xsr_missing_policy_tl {error} {,"missing_glyph_policy":"error"}
           \c_right_brace_str
         }
       \xsr_external_render:nn{#1}{#2}
@@ -79,7 +81,7 @@
   }
 \cs_generate_variant:Nn \file_mdfive_hash:n {V}
 \cs_generate_variant:Nn \str_map_inline:nn {Vn}
-\xsr_register_backend:nnn{khitan}{native-fixed-stack-0.8}{xsr_khitan_render:nn}
+\xsr_register_backend:nnn{khitan}{native-fixed-stack-0.9}{xsr_khitan_render:nn}
 \NewDocumentCommand \xsrKhitanUseFont {m m m}
   {
     \group_begin:
@@ -131,5 +133,16 @@
     \xsr_active_detector_register_suffix:nnn{khitan}{"200B}{"200B}
     \xsr_active_detector_register_space_infix:n{khitan}
   }
+% Backend adapters only supply cell placement; drawing belongs to generic paths.
+\NewDocumentCommand \xsrKhitanSynthetic {m m m m m}
+  {\xsrVectorWarning{XSR-GLYPH-MISSING}
+   \pgfscope
+    \dim_set_eq:NN\l_xsr_vector_em_dim\l_xsr_khitan_em_dim
+    \pgftransformshift{\pgfpoint
+      {\dim_eval:n{\fp_eval:n{#2-#4}\l_xsr_khitan_em_dim}}
+      {\dim_eval:n{\l_xsr_khitan_height_dim-\fp_eval:n{#3+#5}\l_xsr_khitan_em_dim}}}
+    #1
+   \endpgfscope}
+
 \ExplSyntaxOff
 \endinput
