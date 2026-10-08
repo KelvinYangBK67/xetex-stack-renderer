@@ -103,3 +103,26 @@ jobs:
             tmp/ci-inline-glyph-showcase-*.png
             tmp/pdfs/inline-glyph-showcase-build.log
           if-no-files-found: warn
+
+  windows-output-dir:
+    name: Windows shell output-directory compatibility
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install TeX Live 2026
+        uses: TeX-Live/setup-texlive-action@v4
+        with:
+          version: 2026
+          package-file: .github/texlive.packages
+      - name: Install XSR and reference font
+        shell: pwsh
+        run: |
+          python -m pip install -e '.[test]'
+          python scripts/fetch_newgardiner.py
+      - name: Verify Python and XeLaTeX output-directory transport
+        shell: pwsh
+        run: python -m pytest tests/test_shell_output_directory.py -q
