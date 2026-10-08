@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -192,6 +193,18 @@ def write_tex(path: Path, tex: str) -> None:
     path.write_text(tex, encoding='utf-8', newline='\n')
 
 
+def shell_bridge_path(path: Path) -> Path:
+    """Locate TeX-created shell scratch files in TeX's output directory.
+
+    TeX Live 2024+ exports -output-directory as TEXMF_OUTPUT_DIRECTORY for
+    subprocesses invoked by shell escape. Absolute explicit paths are preserved.
+    """
+    output_dir = os.environ.get('TEXMF_OUTPUT_DIRECTORY')
+    if output_dir and not path.is_absolute():
+        return Path(output_dir) / path
+    return path
+
+
 def render_request(args: argparse.Namespace) -> int:
     request = read_request(args.input)
     if request.script != args.backend:
@@ -229,7 +242,7 @@ def cleanup_shell(args):
     from .bundle import bundle_path
     bundle_path(args.jobname)  # Validate a single filename stem, never a path.
     for suffix in ('.xsr-request.req', '.xsr-response.tex'):
-        Path(args.jobname+suffix).unlink(missing_ok=True)
+        shell_bridge_path(Path(args.jobname+suffix)).unlink(missing_ok=True)
     return 0
 
 
@@ -265,6 +278,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == 'render':
+        # Error sentinels and --consume-request must use the same real paths.
+        args.input = shell_bridge_path(args.input)
+        args.output = shell_bridge_path(args.output)
     try:
         return args.func(args)
     except (ValueError, OSError, UnicodeError, OverflowError) as error:

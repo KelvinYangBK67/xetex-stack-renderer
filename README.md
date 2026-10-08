@@ -626,6 +626,11 @@ to persistent caching with `--cache-dir PATH` (Python preprocess/render CLI) or
 `cache-dir=PATH` (TeX shell mode). Explicit provider caches retain their existing
 SVG revalidation and revision-metadata rules.
 
+Shell/auto fallback on TeX Live 2024+ honors -output-directory by using
+TEXMF_OUTPUT_DIRECTORY for shell-escape request/response paths, error
+responses and cleanup. Other distributions must export this variable
+explicitly or use the preprocessing workflow. XSR remains version 0.10.
+
 Shell/auto fallback uses one fixed `<job>.xsr-request.req` / `<job>.xsr-response.tex`
 scratch pair, not one pair per digest. Python consumes each request; successful
 TeX builds remove the remaining scratch pair at document end. A failed/interrupted

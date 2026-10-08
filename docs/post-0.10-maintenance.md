@@ -81,3 +81,18 @@ intentionally updated inline showcase PDF/source is committed.
 Final full-suite and separate-integration results are reported at completion.
 The CI integration selection includes the new bundle tests. No public package
 version bump or dependency change was needed.
+
+
+## Shell bridge with -output-directory (0.10 maintenance)
+
+TeX Live 2024+ exports -output-directory via TEXMF_OUTPUT_DIRECTORY to shell
+subprocesses. XSR's Python shell bridge resolves relative scratch request and
+response files against this directory, including cleanup and renderer error
+sentinels. Absolute explicit paths stay untouched. This does not change
+preprocessing, renderer signatures/digests, font selection or cache directories.
+
+Example: xelatex -shell-escape -output-directory=build document.tex
+
+For distributions without this exported variable, set it explicitly or use
+preprocessing. Font selection still uses a real, readable font file: XeTeX and
+Python must measure the same font binary and validate its fingerprint.
