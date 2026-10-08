@@ -92,10 +92,11 @@ def test_shell_render_error_response_uses_output_dir(
 
 @pytest.mark.skipif(shutil.which('xelatex') is None, reason='xelatex unavailable')
 @pytest.mark.parametrize('directory_kind', ['relative', 'absolute'])
+@pytest.mark.parametrize('explicit_env', [False, True])
 def test_xelatex_shell_escape_with_separate_output_directory(
-    tmp_path: Path, directory_kind: str,
+    tmp_path: Path, directory_kind: str, explicit_env: bool,
 ) -> None:
-    # TeX Live 2024+ exports -output-directory to child processes.
+    # Old TeX Live needs an explicit env variable; 2024+ exports it.
     from conftest import NEW_GARDINER
 
     build = tmp_path / 'build'
@@ -113,6 +114,14 @@ def test_xelatex_shell_escape_with_separate_output_directory(
     output_dir = 'build' if directory_kind == 'relative' else str(build)
     env = os.environ.copy()
     env.pop('TEXMF_OUTPUT_DIRECTORY', None)
+    if explicit_env:
+        env['TEXMF_OUTPUT_DIRECTORY'] = output_dir
+    else:
+        version = subprocess.check_output(['xelatex', '--version'], text=True)
+        import re
+        match = re.search(r'TeX Live (\d{4})', version)
+        if match is None or int(match.group(1)) < 2024:
+            pytest.skip('automatic shell output directory requires TeX Live 2024+')
     env['TEXINPUTS'] = str(ROOT / 'tex') + os.pathsep + env.get('TEXINPUTS', '')
     env['PYTHONPATH'] = str(ROOT / 'src') + os.pathsep + env.get('PYTHONPATH', '')
     result = subprocess.run(
