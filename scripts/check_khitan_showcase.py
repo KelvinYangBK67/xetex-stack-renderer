@@ -1,7 +1,7 @@
 """Sanity-check the committed or rebuilt four- or five-page Khitan PDF."""
 import argparse
 from pathlib import Path
-import fitz
+import pymupdf as fitz
 
 
 def main():

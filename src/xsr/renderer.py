@@ -286,7 +286,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return args.func(args)
     except (ValueError, OSError, UnicodeError, OverflowError) as error:
         code = getattr(error, 'code', 'XSR-REQUEST' if isinstance(error, ValueError) else 'XSR-IO')
-        detail = str(error)
+        detail = str(error).removeprefix(f'[{code}] ')
         if args.command == 'render' and '.xsr-' in args.output.name:
             # Replace any older successful response with a typed error response.
             # The message uses character codes, not interpolated TeX source.

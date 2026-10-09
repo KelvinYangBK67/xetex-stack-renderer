@@ -1,9 +1,11 @@
 '''Unicode-driven stack rendering framework for XeTeX.'''
 
+from importlib.metadata import version as _distribution_version
+
 from .registry import Registry
 
 __all__ = ['Registry', 'build_default_registry']
-__version__ = '0.10'
+__version__ = _distribution_version('xetex-stack-renderer')
 
 
 def build_default_registry() -> Registry:

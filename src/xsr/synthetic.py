@@ -19,6 +19,8 @@ def policy(options):
 
 
 def warn(code, detail):
+    # XSRError messages already include the typed code; warn() adds it once.
+    detail = str(detail).removeprefix(f'[{code}] ')
     warnings.warn(XSRWarning(code, detail), stacklevel=3)
 
 

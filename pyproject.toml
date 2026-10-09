@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'xetex-stack-renderer'
-version = '0.10'
+dynamic = ['version']
 description = 'External renderer framework for Unicode-driven stacked scripts in XeTeX'
 readme = 'README.md'
 requires-python = '>=3.11'
@@ -17,6 +17,9 @@ test = ['pytest>=8', 'pymupdf>=1.24']
 
 [project.scripts]
 xsr-render = 'xsr.renderer:main'
+
+[tool.setuptools.dynamic]
+version = {file = 'VERSION'}
 
 [tool.pytest.ini_options]
 addopts = '-q'
