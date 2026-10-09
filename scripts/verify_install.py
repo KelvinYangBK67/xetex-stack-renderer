@@ -18,7 +18,8 @@ from xsr.khitan import KhitanParser
 from xsr.vector import import_svg, glyph_tex
 from xsr.renderer import default_renderer
 assert Path(xsr.__file__).is_relative_to(Path(sys.prefix)), 'verification must use the installed wheel'
-assert xsr.__version__ == metadata.version('xetex-stack-renderer') == '0.10'
+expected_version = (Path(__file__).resolve().parents[1] / 'VERSION').read_text(encoding='utf-8').strip()
+assert xsr.__version__ == metadata.version('xetex-stack-renderer') == expected_version
 requirements = metadata.requires('xetex-stack-renderer') or []
 assert not any('kage' in r.lower() or 'hieropy' in r.lower() for r in requirements)
 assert EgyptianParser().parse(chr(0x13000))
@@ -47,4 +48,4 @@ if len(sys.argv) > 1:
     assert renderer.render('khitan', chr(0x18B01), {'font_path': root/'tmp/fonts/NotoSerifKhitanSmallScript-Regular.ttf'})
 files = metadata.files('xetex-stack-renderer') or []
 assert not any(str(p).lower().endswith(('.ttf','.otf','.svg','.png','.jpg','.jpeg','.pdf','.dump','.kage')) for p in files)
-print('XSR 0.10 installed wheel: imports, native parsers, vectors, raster/PDF metadata and font rendering pass; no KAGE/Hieropy or bundled assets')
+print(f'XSR {expected_version} installed wheel: imports, native parsers, vectors, raster/PDF metadata and font rendering pass; no KAGE/Hieropy or bundled assets')

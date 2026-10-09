@@ -40,6 +40,8 @@ jobs:
           python scripts/fetch_noto.py
           python scripts/fetch_newgardiner.py
           python scripts/fetch_khitan.py
+      - name: Verify single-source package version
+        run: python scripts/sync_version.py --check
       - name: Verify generated Unicode semantics
         run: python scripts/generate_unicode_data.py --check
       - name: Verify Python, geometry, fonts and XeLaTeX
@@ -74,7 +76,7 @@ jobs:
         run: |
           python -m pip wheel . --no-deps --wheel-dir tmp/wheels
           python -m venv tmp/wheel-env
-          tmp/wheel-env/bin/python -m pip install tmp/wheels/xetex_stack_renderer-0.10-*.whl
+          tmp/wheel-env/bin/python -m pip install tmp/wheels/xetex_stack_renderer-*.whl
           tmp/wheel-env/bin/python scripts/verify_install.py "$PWD"
       - name: Verify no external font binary is tracked
         shell: bash

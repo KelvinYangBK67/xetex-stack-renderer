@@ -1,11 +1,16 @@
 # xetex-stack-renderer
 
-XSR **0.10** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
+XSR **1.0** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
 frontend dispatches complete script runs to registered backends. Egyptian
 Hieroglyphs and Khitan Small Script have independent font-backed backends.
 Registered SVG/PNG/JPEG/PDF assets, direct SVG and optional external providers
 share one generic inline-glyph layout pipeline.
 KAGE is an optional external producer, never an XSR dependency.
+
+XSR is maintained as an internal rendering plugin for IMPE, without a standalone
+release workflow. The direct installation examples below are for development
+and verification. `VERSION` is the sole editable software version source;
+run `python scripts/sync_version.py` to regenerate the TeX version stamp.
 
 ## Install and use
 
