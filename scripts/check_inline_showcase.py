@@ -1,6 +1,6 @@
 """Verify four nonblank pages with image and vector glyphs."""
 import argparse
-import fitz
+import pymupdf as fitz
 
 
 def main():

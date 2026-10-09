@@ -1,6 +1,6 @@
 """Check nonblank vector-only illustrations on all three showcase pages."""
 import argparse
-import fitz
+import pymupdf as fitz
 
 
 def main():

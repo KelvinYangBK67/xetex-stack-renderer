@@ -123,7 +123,7 @@ def ink_mask(font, box, resolution=160, margin=.012):
 def insertion_region(font, core, child, slot):
     mask, unit = ink_mask(font, core)
     w,h = mask.size
-    data = list(mask.getdata())
+    data = mask.tobytes()
     integral = [[0]*(w+1) for _ in range(h+1)]
     for y in range(h):
         running = 0

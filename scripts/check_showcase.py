@@ -1,7 +1,7 @@
 """Automated PDF sanity checks supplement (not replace) visual review."""
 import argparse
 from pathlib import Path
-import fitz
+import pymupdf as fitz
 
 
 def main():
