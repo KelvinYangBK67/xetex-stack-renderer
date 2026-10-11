@@ -21,7 +21,10 @@ crossing line or page breaks. No invisible overlay, reverse OCR, math
 serialization or general LaTeX-source capture is introduced. Ordinary
 font text remains under XeLaTeX/dvipdfmx's `ToUnicode` behavior.
 Some PDF readers ignore `/ActualText`; glyphless decorations may not
-be selectable. Poppler extraction is checked by automated tests.
+be selectable. When copying across adjacent atomic units, a PDF reader
+may infer additional spaces from glyph positions. Each unit's Unicode
+mapping is preserved; full paragraph extraction is not guaranteed byte-for-byte.
+Poppler extraction is checked by automated tests.
 
 ## Install and use
 

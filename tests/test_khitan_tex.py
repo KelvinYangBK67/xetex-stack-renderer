@@ -172,6 +172,11 @@ def test_auto_detector_type_b_and_zwsp(tmp_path):
 def test_cluster_cannot_break_internally(tmp_path):
     output, pdf = compile_tex(tmp_path,
         fr'\parbox{{1em}}{{\xsrKhitanText{{{A+B}}}}}')
-    assert 'Overfull' in output
+    # Atomicity follows from the single unsplittable XSR box. Whether TeX
+    # reports an overfull diagnostic inside a parbox is engine-dependent.
     assert output.count('XSR-LAYOUT script=khitan glyphs=2') == 1
     assert pdf.is_file()
+    from pypdf import PdfReader
+    stream = PdfReader(str(pdf)).pages[0].get_contents().get_data()
+    assert stream.count(b'/ActualText') == 1
+    assert stream.count(b'BDC') == stream.count(b'EMC') == 1
