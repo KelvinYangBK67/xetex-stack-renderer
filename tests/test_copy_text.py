@@ -32,7 +32,7 @@ def test_atomic_markup_encodes_original_sequence():
     source = K_A + KHSF + K_B
     marked = attach_actual_text(source, r"\xsrKhitanLayout{1}{1}{0}{2}{}")
     assert marked.startswith(r"\xsrActualText{")
-    assert bytes.fromhex(marked.split("{", 2)[1]).decode("utf-16-be") == source
+    assert bytes.fromhex(marked.split("{", 2)[1].split("}", 1)[0]).decode("utf-16-be") == source
 
 
 @pytest.mark.skipif(shutil.which("xelatex") is None or shutil.which("pdftotext") is None,
@@ -46,7 +46,13 @@ def test_ehfc_pdf_extraction(tmp_path):
         ["pdftotext", "-raw", str(tmp_path / "integration.pdf"), "-"],
         encoding="utf-8",
     )
-    assert actual.count(source) == 1
+    if actual.count(source) != 1:
+        from pypdf import PdfReader
+        from fitz import open as open_pdf
+        raw = PdfReader(str(tmp_path / "integration.pdf")).pages[0].get_contents().get_data()
+        with open_pdf(str(tmp_path / "integration.pdf")) as document:
+            extracted = document[0].get_text()
+        raise AssertionError((repr(actual), repr(extracted), raw[-6000:].decode("latin1", "replace")))
 
 
 @pytest.mark.skipif(shutil.which("xelatex") is None or shutil.which("pdftotext") is None,
@@ -59,4 +65,10 @@ def test_khsf_and_zwsp_pdf_extraction(tmp_path):
     _stdout, pdf = compile_tex(tmp_path, "Before " + source + " after")
     actual = subprocess.check_output(["pdftotext", "-raw", str(pdf), "-"],
                                      encoding="utf-8")
-    assert actual.count(source) == 1
+    if actual.count(source) != 1:
+        from pypdf import PdfReader
+        from fitz import open as open_pdf
+        raw = PdfReader(str(pdf)).pages[0].get_contents().get_data()
+        with open_pdf(str(pdf)) as document:
+            extracted = document[0].get_text()
+        raise AssertionError((repr(actual), repr(extracted), raw[-6000:].decode("latin1", "replace")))
