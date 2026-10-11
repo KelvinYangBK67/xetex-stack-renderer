@@ -7,10 +7,11 @@ from ..errors import XSRError
 from ..synthetic import FallbackFont, policy
 from ..vector import tofu, paths_tex
 from ..font_metrics import options_font, font_options, encode_path, tex_font_path
+from ..copy_text import attach_actual_text
 from .parser import KhitanParser
 from .layout import KhitanLayout
 
-BACKEND_VERSION = 'native-fixed-stack-0.9'
+BACKEND_VERSION = 'native-fixed-stack-1.1'
 
 
 def number(value: float) -> str:
@@ -78,9 +79,17 @@ class KhitanBackend:
                 ''.join('{' + number(v) + '}' for v in
                         (g.x, g.y, g.ink_left, g.ink_top))
                 for g in box.glyphs)
-            pieces.append(r'\xsrKhitanLayout{' + number(box.width) + '}{' +
-                          number(box.height) + '}{' + number(box.depth) + '}{' +
-                          str(len(box.glyphs)) + '}{' + glyphs + '}')
+            drawn = (r'\xsrKhitanLayout{' + number(box.width) + '}{' +
+                     number(box.height) + '}{' + number(box.depth) + '}{' +
+                     str(len(box.glyphs)) + '}{' + glyphs + '}')
+            # Preserve the undrawn filler and preceding separator explicitly.
+            unit = ''.join(map(chr, cluster.characters))
+            if cluster.kind == 'B':
+                unit = unit[:1] + chr(0x16FE4) + unit[1:]
+            if index:
+                unit = (' ' if parsed.separators[index - 1] == 'space'
+                        else chr(0x200B)) + unit
+            pieces.append(attach_actual_text(unit, drawn))
         digest = hashlib.sha256(text.encode('utf-8')).hexdigest()[:12]
         body = r'\xsrKhitanUseFont{' + encode_path(tex_font_path(font.path)) + '}{' + font.digest + '}{' + ''.join(pieces) + '}'
         return (r'\xsrBackendLayoutResult{khitan}{' + str(len(text)) + '}{' + digest +

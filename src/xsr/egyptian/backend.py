@@ -9,13 +9,14 @@ from ..synthetic import FallbackFont, policy
 from ..vector import tofu, paths_tex
 from ..font_metrics import options_font, font_options, encode_path, tex_font_path
 from ..ink import matrix
+from ..copy_text import attach_actual_text
 from .parser import EgyptianParser
 from .model import RenderResult
 from .layout import EgyptianLayout
 from .semantics import layout_options
 
 
-BACKEND_VERSION = 'font-aware-ehfc-0.9'
+BACKEND_VERSION = 'font-aware-ehfc-1.1'
 
 
 def _tex_number(value: float) -> str:
@@ -77,8 +78,13 @@ class EgyptianBackend:
         font = FallbackFont(options_font(options), policy(options))
         tex_font_path(font.path)
         direction=layout_options(options)
-        quadrats=EgyptianLayout(font,direction).quadrats(self.parser.parse(text))
-        layout_tex=r'\xsrEgyptianBreak{}'.join(serialize_tex_layout(q, font.missing) for q in quadrats)
+        parsed = self.parser.parse(text)
+        quadrats = EgyptianLayout(font,direction).quadrats(parsed)
+        # Source slices correspond to atomic quadrats; no glyph-order inversion.
+        layout_tex = r'\xsrEgyptianBreak{}'.join(
+            attach_actual_text(source, serialize_tex_layout(q, font.missing))
+            for source, q in zip(parsed.quadrat_texts, quadrats, strict=True)
+        )
         layout_tex=r'\xsrEgyptianFlow{'+direction+'}{'+layout_tex+'}'
         digest = hashlib.sha256(text.encode('utf-8')).hexdigest()[:12]
         parser = f'xsr-native-{self.parser.parser_version}'
