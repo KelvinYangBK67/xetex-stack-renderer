@@ -188,9 +188,14 @@ class EgyptianParser:
 
     def parse(self, text: str) -> ParsedEgyptianRun:
         reader = _Reader(text)
-        parts = reader.sequence()
+        parts, spans = [], []
+        while reader.peek() is not None:
+            start = reader.pos
+            parts.append(reader.vertical())
+            spans.append(text[start:reader.pos])
         if not parts: raise EgyptianParseError(text,'empty Egyptian run')
-        return ParsedEgyptianRun(text,self.parser_version,EgyptianNode('run',tuple(parts)))
+        return ParsedEgyptianRun(text,self.parser_version,
+                                 EgyptianNode('run',tuple(parts)),tuple(spans))
 
     def layout(self,text: str,font: FontMetrics,direction='ltr',
                writing_mode='horizontal') -> RenderResult:

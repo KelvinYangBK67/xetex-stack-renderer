@@ -72,6 +72,18 @@
       { \msg_error:nnn { xsr } { missing-backend } {#1} }
   }
 
+% Preserve an atomic stack's original Unicode via dvipdfmx marked content.
+% A single hbox prevents either BDC or EMC from crossing a page boundary.
+% #1 is UTF-16BE hexadecimal without BOM, supplied by the renderer.
+\NewDocumentCommand \xsrActualText { m +m }
+  {
+    \hbox{
+      \special{pdf:code /Span << /ActualText <FEFF#1> >> BDC}
+      #2
+      \special{pdf:code EMC}
+    }
+  }
+
 % Content-addressed external-renderer bridge.
 \iow_new:N \g_xsr_request_iow
 \seq_new:N \l_xsr_codepoints_seq

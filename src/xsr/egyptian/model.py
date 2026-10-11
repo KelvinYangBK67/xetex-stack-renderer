@@ -24,6 +24,7 @@ class ParsedEgyptianRun:
     text: str
     parser_version: str
     structure: EgyptianNode
+    quadrat_texts: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
