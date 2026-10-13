@@ -180,3 +180,37 @@ def test_cluster_cannot_break_internally(tmp_path):
     stream = PdfReader(str(pdf)).pages[0].get_contents().get_data()
     assert stream.count(b'/ActualText') == 1
     assert stream.count(b'BDC') == stream.count(b'EMC') == 1
+
+@requires_tex
+@pytest.mark.parametrize('source', [A+B, A+' '+B+C, A+F+B+' '+A+C])
+def test_centered_paragraph_starts_with_khitan_clusters(tmp_path, source):
+    """The first atomic ActualText box must join the host centered paragraph.
+
+    Without entering horizontal mode before the first box, XeTeX deposits that
+    box at the left margin of the vertical list; subsequent clusters alone
+    enter the centered paragraph. Assert the PDF ink location, not just TeX exit.
+    """
+    body = (r'\pagestyle{empty}' + '\n'
+            + r'\begin{center}' + '\n'
+            + fr'\xsrKhitanText{{{source}}}' + '\n'
+            + r'\end{center}')
+    output, pdf = compile_tex(tmp_path, body)
+    assert 'XSR-UNAVAILABLE' not in output
+    with fitz.open(pdf) as document:
+        page = document[0]
+        pix = page.get_pixmap(alpha=False)
+        # There is no other printed text or page number in this fixture.
+        rgb = pix.samples
+        stride = pix.n
+        occupied_x = [
+            x for y in range(pix.height)
+            for x in range(pix.width)
+            if min(rgb[(y * pix.width + x) * stride:
+                       (y * pix.width + x) * stride + 3]) < 90
+        ]
+        assert occupied_x, 'The Khitan font yielded no visible ink.'
+        center = (min(occupied_x) + max(occupied_x)) / 2
+        assert abs(center - page.rect.width / 2) < 22, (
+            f'Khitan ink drifted from page center: {center}, '
+            f'expected {page.rect.width / 2}'
+        )
