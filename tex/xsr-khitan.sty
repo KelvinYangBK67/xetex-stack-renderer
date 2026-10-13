@@ -85,6 +85,10 @@
 \xsr_register_backend:nnn{khitan}{native-fixed-stack-1.1}{xsr_khitan_render:nn}
 \NewDocumentCommand \xsrKhitanUseFont {m m m}
   {
+    % Each cluster is wrapped in an ActualText hbox. Enter the host paragraph
+    % before the FIRST hbox, or the first cluster becomes a separate vlist item
+    % and following clusters alone receive centering/paragraph alignment.
+    \mode_leave_vertical:
     \group_begin:
       \xsr_khitan_decode:n{#1}
       \str_if_eq:eeF
