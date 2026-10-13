@@ -1,6 +1,6 @@
 # xetex-stack-renderer
 
-XSR **1.1** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
+XSR **1.2** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
 frontend dispatches complete script runs to registered backends. Egyptian
 Hieroglyphs and Khitan Small Script have independent font-backed backends.
 Registered SVG/PNG/JPEG/PDF assets, direct SVG and optional external providers
@@ -11,6 +11,15 @@ XSR is maintained as an internal rendering plugin for IMPE, without a standalone
 release workflow. The direct installation examples below are for development
 and verification. `VERSION` is the sole editable software version source;
 run `python scripts/sync_version.py` to regenerate the TeX version stamp.
+
+## Khitan host-paragraph alignment (1.2)
+
+Khitan Small Script now enters the host paragraph before emitting its first
+atomic, Unicode-preserving stack. This keeps the initial glyph cluster inside
+the same centered or aligned paragraph as following clusters, including TeX
+table cells. No cluster grammar, glyph geometry, Unicode mapping, or existing
+public command has changed. Centered XeLaTeX/PDF regressions cover ordinary
+and Type B clusters.
 
 ## Unicode extraction in PDF (1.1)
 
