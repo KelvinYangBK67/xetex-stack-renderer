@@ -4,36 +4,14 @@ XSR **1.2** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
 frontend dispatches complete script runs to registered backends. Egyptian
 Hieroglyphs and Khitan Small Script have independent font-backed backends.
 Registered SVG/PNG/JPEG/PDF assets, direct SVG and optional external providers
-share one generic inline-glyph layout pipeline.
+share one generic inline-glyph layout pipeline. Egyptian quadrats and Khitan
+clusters preserve their source Unicode in PDF `/ActualText` spans.
 KAGE is an optional external producer, never an XSR dependency.
 
 XSR is maintained as an internal rendering plugin for IMPE, without a standalone
 release workflow. The direct installation examples below are for development
 and verification. `VERSION` is the sole editable software version source;
 run `python scripts/sync_version.py` to regenerate the TeX version stamp.
-
-## Khitan host-paragraph alignment (1.2)
-
-Khitan Small Script now enters the host paragraph before emitting its first
-atomic, Unicode-preserving stack. This keeps the initial glyph cluster inside
-the same centered or aligned paragraph as following clusters, including TeX
-table cells. No cluster grammar, glyph geometry, Unicode mapping, or existing
-public command has changed. Centered XeLaTeX/PDF regressions cover ordinary
-and Type B clusters.
-
-## Unicode extraction in PDF (1.1)
-
-Egyptian quadrats and Khitan clusters preserve their literal input Unicode in
-PDF `/ActualText` spans, including EHFC, KHSF, variation selectors and
-zero-width separators. The spans belong to atomic layout boxes rather than
-crossing line or page breaks. No invisible overlay, reverse OCR, math
-serialization or general LaTeX-source capture is introduced. Ordinary
-font text remains under XeLaTeX/dvipdfmx's `ToUnicode` behavior.
-Some PDF readers ignore `/ActualText`; glyphless decorations may not
-be selectable. When copying across adjacent atomic units, a PDF reader
-may infer additional spaces from glyph positions. Each unit's Unicode
-mapping is preserved; full paragraph extraction is not guaranteed byte-for-byte.
-Poppler extraction is checked by automated tests.
 
 ## Install and use
 
@@ -69,7 +47,7 @@ contain `"`, `{`, `}`, `%`, `#`, `[` or `]`, NUL or line breaks. Font commands t
 literal paths, not macro expressions. Paths cross the TeX/Python boundary as
 Unicode codepoint lists rather than interpolated JSON strings.
 
-## Generic inline glyphs (0.10)
+## Generic inline glyphs
 
 An inline glyph participates in running text; it is not a figure. Register a
 reasonably prepared file and use its label:
@@ -192,18 +170,12 @@ stack detects cycles. Include lookup prefers the current parent directory,
 then explicit entrypoint directories in order; previously visited directories
 do not change lookup. Literal traversal is not a general TeX interpreter.
 
-Post-0.10 maintenance keeps the public release number at 0.10 and uses internal
-backend version `inline-0.10-optical-1` for the optical policy/response format;
-old inline responses cannot match the new digest. See the
-[maintenance record](docs/post-0.10-maintenance.md).
-
-0.10 adds no KAGE implementation, Bai-style IDS, zi.tools or GlyphWiki
-integration, IDS-to-geometry, Han-to-IDS lookup, network glyph fetching, IMPE
-integration, logical/transcription metadata, ActualText, accessibility/index
-semantics or PDF copy/paste handling. Identity metadata exists only for XSR's
-cache. See the [four-page inline showcase](examples/inline-glyph-showcase.pdf),
-its [source](examples/inline-glyph-showcase.tex), and
-[release verification](docs/v0.10-verification.md).
+The inline backend uses response-format identity `inline-0.10-optical-1`;
+this is a cache/protocol identifier, independent of the XSR software version.
+Its bundle transport and optical image policy are documented in the
+[0.10 maintenance record](docs/post-0.10-maintenance.md).
+For the introduction of raster/PDF input, see
+[0.10 verification](docs/v0.10-verification.md).
 
 ## External vector glyphs and providers
 
@@ -211,8 +183,8 @@ The three layers are deliberately separate:
 
 1. Font-backed measurement and script layout: Egyptian and Khitan.
 2. Generic geometry: imported SVG and synthetic missing-glyph boxes.
-3. Optional external producer invocation: a generic provider, with a thin
-   KAGE-facing TeX convenience API. No stroke/component engine lives in XSR.
+3. Optional external producer invocation: a generic provider, with KAGE-facing
+   TeX convenience commands.
 
 ### Direct SVG
 
@@ -362,8 +334,8 @@ Provider failures are not stored as successful SVG; their typed fallback
 responses can still be reused within the TeX document. Change the configuration
 metadata revision or remove the provider cache when the engine/dataset changes.
 The provider cannot reveal changes to its environment unless its configured
-identity changes. The `obtain_many` abstraction leaves future batch invocation
-open; 0.10 invokes one process per unique uncached request.
+identity changes. The `obtain_many` abstraction provides a batch-capable interface; the current
+producer bridge invokes one process per unique uncached request.
 
 ### Missing-glyph policy
 
@@ -392,10 +364,6 @@ See the [three-page vector/provider showcase](examples/vector-showcase.pdf),
 its [source](examples/vector-showcase.tex), and [0.9 verification](docs/v0.9-verification.md).
 Rebuild it with `python scripts/build_vector_showcase.py` after fetching the two
 Noto reference fonts. Real KAGE is neither used nor required for the showcase or CI.
-
-Intentional non-goals: KAGE stroke/component algorithms, GlyphWiki downloading,
-IDS/Han synthesis, font-style fitting, font export, PUA mappings, vertical-flow
-changes, general SVG, raster fallback, and automatic provider environment management.
 
 ## Khitan Small Script
 
@@ -431,10 +399,11 @@ original glyph in a fixed slot. Every glyph has scale 1: no Noto positional
 alternates, discretionary ligatures, compression, rotation, or glyph-specific
 coordinate tables are required. A two-column cluster is approximately two
 font ems wide. It is an indivisible, upright box with natural height, bottom
-aligned to the horizontal text baseline. A four-row cluster is at least four
-ems high and enlarges only its containing TeX line. Full traditional vertical
-document flow is reserved; the internal cluster order and geometry can be
-reused by a future vertical host.
+aligned to the horizontal text baseline. The renderer enters the host paragraph
+before its first atomic cluster, retaining alignment in centered paragraphs
+and table cells. A four-row cluster is at least four ems high and enlarges
+only its containing TeX line. Cluster geometry is independent of the host
+text direction; full vertical document flow has a reserved interface.
 
 The [five-page Khitan showcase](examples/khitan-showcase.pdf) includes a
 reference comparison with Noto's native rclt shaping and a fifth page comparing
@@ -450,22 +419,22 @@ ad6d20d17e7b0af746106b8e0e3ac65c47f6813a4acb6e05786023e1374a953f.
 No font binary is committed. The optional Linear font file used for the
 committed comparison page has SHA-256
 E5DEA2755975D4BAAFA3DAF5E6A695C1338F3298B3836B07EE39FD1E61B7BC95.
-The official Noto v1.000 font lacks U+18CFF. XSR 0.10 renders a synthetic
+The official Noto v1.000 font lacks U+18CFF. XSR renders a synthetic
 1em hollow box in its normal KSS slot and logs `XSR-GLYPH-MISSING`.
 The strict `error` policy raises instead; a font with an outline uses that outline.
 
 Unicode sources for these rules are [Unicode 18 chapter 18, section 18.12](https://www.unicode.org/versions/Unicode18.0.0/core-spec/chapter-18/),
 the [Unicode 18 names list for U+18B00..U+18CFF](https://www.unicode.org/Public/18.0.0/charts/nameslist/18b00/),
 and the [Khitan cluster proposal figures](https://www.unicode.org/L2/L2018/18121r-n4943-khitan-cluster.pdf).
-The current Unicode chapter defines U+16FE4 as the Type B marker; older
-proposal examples using CGJ are not the 0.8 syntax.
+The Unicode chapter defines U+16FE4 as the Type B marker; earlier
+proposal examples using CGJ do not describe the current encoded syntax.
 
 ## EHFC support
 
 The accepted syntax follows Unicode 18 Egyptian format controls. XSR parses EHFC natively.
 Start/end are logical: left/right in LTR, right/left in RTL.
 
-| Feature | Controls / support in 0.7 |
+| Feature | Controls / support |
 | --- | --- |
 | Plain signs | Unicode glyphs present in the selected font |
 | Vertical / horizontal | U+13430 / U+13431; nested groups |
@@ -618,6 +587,24 @@ loads a response. Python callers can supply `{'font_path': '/absolute/font.ttf'}
 the backend canonicalizes options before cache lookup. MD5 is a cache fingerprint,
 not an authenticity mechanism.
 
+## PDF Unicode extraction
+
+Egyptian quadrats and Khitan clusters retain their **literal source Unicode**
+through PDF `/ActualText` spans. The mappings include Egyptian format
+controls (EHFC), Khitan filler U+16FE4, variation selectors and zero-width
+cluster separators. Each span belongs to an atomic layout box, so it does
+not cross a line or page boundary. This preserves logical reading order
+independently of visual stacking and position.
+
+Ordinary text continues to use XeLaTeX/dvipdfmx `ToUnicode` mappings.
+The mechanism attaches semantic text to drawn boxes; it adds no invisible
+text overlay. Some PDF readers ignore `/ActualText`, and glyphless
+decorations may be unselectable. A reader can infer spaces between adjacent
+atomic units from their positions, so full-paragraph extraction depends on
+the PDF reader. The individual units retain their original sequences.
+See [1.1 verification](docs/v1.1-verification.md) and
+`tests/test_copy_text.py` for source and PDF-level checks.
+
 ## Preprocess without shell escape
 
 Use `\usepackage[mode=preprocess]{xetex-stack-renderer}` and literal default/local
@@ -657,7 +644,7 @@ SVG revalidation and revision-metadata rules.
 Shell/auto fallback on TeX Live 2024+ honors -output-directory by using
 TEXMF_OUTPUT_DIRECTORY for shell-escape request/response paths, error
 responses and cleanup. Other distributions must export this variable
-explicitly or use the preprocessing workflow. XSR remains version 0.10.
+explicitly or use the preprocessing workflow.
 
 Shell/auto fallback uses one fixed `<job>.xsr-request.req` / `<job>.xsr-response.tex`
 scratch pair, not one pair per digest. Python consumes each request; successful
@@ -665,11 +652,6 @@ TeX builds remove the remaining scratch pair at document end. A failed/interrupt
 build may retain the scratch response for diagnosis. Auto mode first tries a
 matching bundled response, then shell execution if allowed. No new shell escape
 permission, pipes or shell-specific cleanup command is required.
-
-When migrating a 0.10 document directory, obsolete `<job>.xsr-<hash>.tex`, the old
-`<job>.xsr-manifest.json`, and an unwanted `.xsr-cache/` may be removed manually.
-The new workflow ignores those old responses and does not delete existing files
-that may be shared with another build.
 
 The preprocessor recursively follows literal `\input{file}` and `\include{file}`,
 appending `.tex` when needed. It searches the containing source directory first,
@@ -712,25 +694,32 @@ so an unsuccessful invocation cannot silently reuse an earlier successful respon
 
 ## Verification and showcase
 
-```powershell
+The following commands use the downloadable reference fonts and build
+checkable PDFs without Windows-specific fonts or private file paths:
+
+```sh
 python -m pip install '.[test]'
 python scripts/fetch_noto.py
 python scripts/fetch_newgardiner.py
 python scripts/fetch_khitan.py
 python -m pytest
 python -m pytest tests/test_tex_integration.py tests/test_khitan_tex.py tests/test_vector_tex.py tests/test_inline_tex.py tests/test_bundles.py
-python scripts/build_showcase.py --font tmp/fonts/NotoSansEgyptianHieroglyphs-Regular.ttf --font tmp/fonts/NewGardiner.ttf --font C:/Windows/Fonts/seguihis.ttf
-python scripts/check_showcase.py examples/egyptian-showcase.pdf
-python scripts/build_khitan_showcase.py --font tmp/fonts/NotoSerifKhitanSmallScript-Regular.ttf --comparison-font D:/_INBOX/Download/KhitanSmallLinear.ttf
-python scripts/check_khitan_showcase.py examples/khitan-showcase.pdf
-python scripts/build_vector_showcase.py
-python scripts/check_vector_showcase.py examples/vector-showcase.pdf
-python scripts/build_inline_showcase.py
-python scripts/check_inline_showcase.py examples/inline-glyph-showcase.pdf
+python scripts/build_showcase.py --font tmp/fonts/NotoSansEgyptianHieroglyphs-Regular.ttf --font tmp/fonts/NewGardiner.ttf --output tmp/egyptian-showcase.pdf
+python scripts/check_showcase.py tmp/egyptian-showcase.pdf
+python scripts/build_khitan_showcase.py --font tmp/fonts/NotoSerifKhitanSmallScript-Regular.ttf --output tmp/khitan-showcase.pdf
+python scripts/check_khitan_showcase.py tmp/khitan-showcase.pdf
+python scripts/build_vector_showcase.py --output tmp/vector-showcase.pdf
+python scripts/check_vector_showcase.py tmp/vector-showcase.pdf
+python scripts/build_inline_showcase.py --output tmp/inline-glyph-showcase.pdf
+python scripts/check_inline_showcase.py tmp/inline-glyph-showcase.pdf
 ```
 
+For local comparison with Segoe UI Historic or Khitan Small Linear, pass
+`--font` or `--comparison-font` to the relevant builder using the
+locally installed font path. Both fonts are optional test inputs.
+
 The builder accepts two or three fonts and compiles in a fresh temporary directory
-without shell escape. The committed [six-page 0.10 showcase](examples/egyptian-showcase.pdf)
+without shell escape. The committed [six-page Egyptian showcase](examples/egyptian-showcase.pdf)
 and [editable source](examples/egyptian-showcase.tex) compare Noto, NewGardiner and
 Segoe UI Historic across basic layout, all seven insertion slots, overlay,
 enclosures, registered transforms, RTL, editorial brackets, continuous shading,
@@ -745,12 +734,14 @@ commits. NewGardiner is fetched from its pinned official upstream revision; Sego
 optional on Windows. No external fonts are vendored. Noto can also be selected with `XSR_NOTO_FONT`; additional test
 fonts use `XSR_TEST_FONTS` (an `os.pathsep`-separated list).
 
-See [0.7 verification](docs/v0.7-verification.md). The
-[0.6 verification and unsupported-case audit](docs/v0.6-verification.md) is historical.
-The [0.5 verification](docs/v0.5-verification.md) and
-[0.4 verification](docs/v0.4-verification.md) are historical records.
+Current version evidence: [1.2 verification](docs/v1.2-verification.md) and
+[1.1 Unicode extraction](docs/v1.1-verification.md). Historical release
+records cover [0.10](docs/v0.10-verification.md),
+[0.9](docs/v0.9-verification.md), [0.8](docs/v0.8-verification.md),
+[0.7](docs/v0.7-verification.md), [0.6](docs/v0.6-verification.md),
+[0.5](docs/v0.5-verification.md) and [0.4](docs/v0.4-verification.md).
 
-## Remaining limits
+## Compatibility and boundaries
 
 - Static TrueType fonts have the broadest verification. Static CFF outlines are
   supported through fontTools; variable fonts, collections, webfonts and color-only
