@@ -10,8 +10,9 @@ def main():
     args = parser.parse_args()
     with fitz.open(args.pdf) as pdf:
         assert len(pdf) in (4, 5), f'expected four or five pages, found {len(pdf)}'
+        version = (Path(__file__).resolve().parents[1] / 'VERSION').read_text(encoding='utf-8').strip()
         for index, page in enumerate(pdf):
-            assert 'XSR 0.10 | Khitan Small Script' in page.get_text(), index
+            assert f'XSR {version} | Khitan Small Script' in page.get_text(), index
             assert page.get_fonts(), f'no embedded fonts on page {index+1}'
             pix = page.get_pixmap(matrix=fitz.Matrix(1, 1), alpha=False)
             assert sum(value < 100 for value in pix.samples) > 1000, index
