@@ -11,7 +11,7 @@
 \tl_new:N \l_xsr_khitan_font_digest_tl
 \tl_new:N \l_xsr_khitan_font_codepoints_tl
 \tl_new:N \l_xsr_khitan_gap_tl
-\tl_set:Nn \l_xsr_khitan_gap_tl {0.2}
+\tl_set:Nn \l_xsr_khitan_gap_tl {normal}
 \msg_new:nnn{xsr-khitan}{font-required}
   {[XSR-FONT-NOT-SELECTED]~Select~a~Khitan~font~with~\string\xsrKhitanFont.}
 \msg_new:nnn{xsr-khitan}{font-missing}
@@ -71,7 +71,8 @@
       \tl_set:Nx \g_xsr_renderer_options_tl
         {
           \c_left_brace_str
-          "cluster_gap":\l_xsr_khitan_gap_tl,
+          \str_if_eq:VnF \l_xsr_khitan_gap_tl {normal}
+            {"cluster_gap":\l_xsr_khitan_gap_tl,}
           "font_codepoints":"\l_xsr_khitan_font_codepoints_tl",
           "font_digest":"\l_xsr_khitan_font_digest_tl"
           \str_if_eq:VnT \l_xsr_missing_policy_tl {error} {,"missing_glyph_policy":"error"}
@@ -82,7 +83,7 @@
   }
 \cs_generate_variant:Nn \file_mdfive_hash:n {V}
 \cs_generate_variant:Nn \str_map_inline:nn {Vn}
-\xsr_register_backend:nnn{khitan}{native-fixed-stack-1.1}{xsr_khitan_render:nn}
+\xsr_register_backend:nnn{khitan}{native-fixed-stack-1.3}{xsr_khitan_render:nn}
 \NewDocumentCommand \xsrKhitanUseFont {m m m}
   {
     % Each cluster is wrapped in an ActualText hbox. Enter the host paragraph
@@ -96,7 +97,9 @@
         {\msg_fatal:nn{xsr-khitan}{font-changed}}
       \tex_font:D \l_xsr_khitan_font =
         "[\l_xsr_khitan_font_path_tl]"~at~\f@size pt\scan_stop:
-      \l_xsr_khitan_font #3
+      % Select Khitan font only for each drawn sign; keep the host font
+      % active for ordinary interword glue between atomic clusters.
+      #3
     \group_end:
   }
 \dim_new:N \l_xsr_khitan_em_dim
@@ -120,6 +123,10 @@
       \dim_set:Nn \l_xsr_khitan_height_dim {#2\l_xsr_khitan_em_dim}
       \iow_term:x{XSR-LAYOUT~script=khitan~glyphs=#4~width=#1~height=#2~depth=#3}
       \mode_leave_vertical:
+      % Align cluster centers at the host text's 0.5em center, rather
+      % than bottom-aligning stacks of different row counts.
+      \tex_lower:D \dim_eval:n
+        {\fp_eval:n{(#2-#3-1)/2}\l_xsr_khitan_em_dim}
       \hbox{\pgfpicture
         \pgfpathrectangle{\pgfpoint{0pt}{-#3\l_xsr_khitan_em_dim}}
           {\pgfpoint{#1\l_xsr_khitan_em_dim}
@@ -130,7 +137,9 @@
     \group_end:
   }
 \NewDocumentCommand \xsrKhitanBreak {m}
-  {\penalty0\hskip #1em\relax}
+  {\str_if_eq:nnTF {#1}{space}
+    {\space} % U+0020: host-font interword glue, including \spaceskip.
+    {\penalty0\hskip #1em\relax}} % explicit legacy gap or ZWSP.
 \cs_if_exist:NT \xsr_active_detector_register:nn
   {
     \xsr_active_detector_register:nn{khitan}{18B00-18CDA,18CFF-18CFF}

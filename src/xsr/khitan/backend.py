@@ -11,7 +11,7 @@ from ..copy_text import attach_actual_text
 from .parser import KhitanParser
 from .layout import KhitanLayout
 
-BACKEND_VERSION = 'native-fixed-stack-1.1'
+BACKEND_VERSION = 'native-fixed-stack-1.3'
 
 
 def number(value: float) -> str:
@@ -27,11 +27,14 @@ class KhitanBackend:
 
     @classmethod
     def preprocess_extras(cls, sources) -> list[dict[str, object]]:
-        gaps = {'0.2'}
+        gaps = {'normal'}
         for source in sources:
             gaps.update(re.findall(r'\\xsrKhitanClusterGap\s*\{([^{}]+)\}', source))
-        return [{'cluster_gap': cls._gap({'cluster_gap': gap})}
-                for gap in sorted(gaps)]
+        result = []
+        for gap in sorted(gaps):
+            resolved = cls._gap({'cluster_gap': gap})
+            result.append({} if resolved is None else {'cluster_gap': resolved})
+        return result
 
     def prepare_options(self, options: Mapping[str, object]) -> dict[str, object]:
         self._mode(options)
@@ -40,7 +43,7 @@ class KhitanBackend:
         result = font_options(font.path)
         if policy(options) != 'box':
             result['missing_glyph_policy'] = policy(options)
-        if gap != 0.2:
+        if gap is not None:
             result['cluster_gap'] = gap
         return result
 
@@ -51,9 +54,12 @@ class KhitanBackend:
                            'Khitan supports horizontal host text only')
 
     @staticmethod
-    def _gap(options: Mapping[str, object]) -> float:
+    def _gap(options: Mapping[str, object]) -> float | None:
+        requested = options.get('cluster_gap', 'normal')
+        if requested is None or requested == 'normal':
+            return None
         try:
-            gap = float(options.get('cluster_gap', 0.2))
+            gap = float(requested)
         except (TypeError, ValueError) as error:
             raise XSRError('XSR-KHITAN-GAP', 'cluster_gap must be a finite nonnegative em value') from error
         import math
@@ -71,7 +77,8 @@ class KhitanBackend:
         pieces = []
         for index, cluster in enumerate(parsed.clusters):
             if index:
-                pieces.append(r'\xsrKhitanBreak{' + (number(gap) if parsed.separators[index - 1] == 'space' else '0') + '}')
+                marker = ('space' if gap is None else number(gap)) if parsed.separators[index - 1] == 'space' else '0'
+                pieces.append(r'\xsrKhitanBreak{' + marker + '}')
             box = layout.cluster(cluster)
             glyphs = ''.join(
                 (r'\xsrKhitanSynthetic{' + paths_tex(tofu()) + '}' if g.codepoint in font.missing

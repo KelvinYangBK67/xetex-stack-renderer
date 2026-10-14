@@ -66,7 +66,7 @@ def test_type_b_lengths(tmp_path, length):
 
 
 @requires_tex
-@pytest.mark.parametrize(('separator', 'gap'), [(' ', '0.2'), (Z, '0')])
+@pytest.mark.parametrize(('separator', 'gap'), [(' ', 'space'), (Z, '0')])
 def test_separator_gap_and_single_dispatch(tmp_path, separator, gap):
     output, _ = compile_tex(tmp_path, fr'Latin \xsrKhitanText{{{A+B+separator+A+B}}} Latin',prepare=True)
     assert output.count('XSR-LAYOUT script=khitan glyphs=2') == 2
@@ -214,3 +214,36 @@ def test_centered_paragraph_starts_with_khitan_clusters(tmp_path, source):
             f'Khitan ink drifted from page center: {center}, '
             f'expected {page.rect.width / 2}'
         )
+
+
+@requires_tex
+def test_normal_space_uses_host_spaceskip_and_legacy_gap_is_fixed(tmp_path):
+    sample = A + ' ' + B
+    body = (r'\setbox0=\hbox{\spaceskip=5pt \xsrKhitanText{' + sample + '}}'
+            + '\n' + r'\setbox2=\hbox{\spaceskip=17pt \xsrKhitanText{' + sample + '}}'
+            + '\n' + r'\typeout{XSR-NORMAL-SPACE-DELTA=\the\dimexpr\wd2-\wd0\relax}'
+            + '\n' + r'\setbox4=\hbox{\spaceskip=5pt \xsrKhitanClusterGap{0.2}\xsrKhitanText{' + sample + '}}'
+            + '\n' + r'\setbox6=\hbox{\spaceskip=17pt \xsrKhitanClusterGap{0.2}\xsrKhitanText{' + sample + '}}'
+            + '\n' + r'\typeout{XSR-FIXED-SPACE-DELTA=\the\dimexpr\wd6-\wd4\relax}')
+    output, _ = compile_tex(tmp_path, body)
+    natural = re.search(r'XSR-NORMAL-SPACE-DELTA=([\d.]+)pt', output)
+    fixed = re.search(r'XSR-FIXED-SPACE-DELTA=([\d.]+)pt', output)
+    assert natural and float(natural.group(1)) == pytest.approx(12, abs=0.02), output
+    assert fixed and float(fixed.group(1)) == pytest.approx(0, abs=0.02), output
+
+
+@requires_tex
+def test_mixed_height_clusters_share_a_vertical_midline(tmp_path):
+    body = (r'\setbox0=\hbox{\xsrKhitanText{' + A + B + '}}'
+            + '\n' + r'\setbox2=\hbox{\xsrKhitanText{' + A * 8 + '}}'
+            + '\n' + r'\typeout{XSR-SHORT-MIDLINE=\the\dimexpr\ht0-\dp0\relax}'
+            + '\n' + r'\typeout{XSR-TALL-MIDLINE=\the\dimexpr\ht2-\dp2\relax}'
+            + '\n' + r'\typeout{XSR-TALL-DEPTH=\the\dp2}')
+    output, _ = compile_tex(tmp_path, body)
+    def pt(label):
+        match = re.search(label + r'=([\d.]+)pt', output)
+        assert match, output
+        return float(match.group(1))
+    assert pt('XSR-SHORT-MIDLINE') == pytest.approx(
+        pt('XSR-TALL-MIDLINE'), abs=0.02)
+    assert pt('XSR-TALL-DEPTH') > 0

@@ -174,7 +174,7 @@ def test_preprocess_discovers_script_fonts_and_gap(tmp_path):
     manifest = json.loads((tmp_path / '.xsr/mixed.manifest.json').read_text(encoding='utf-8'))
     assert {run['script'] for run in manifest['runs']} == {'egyptian', 'khitan'}
     assert {run['options'].get('cluster_gap') for run in manifest['runs']
-            if run['script'] == 'khitan'} == {0.2, 0.35}
+            if run['script'] == 'khitan'} == {None, 0.35}
     assert all('cluster_gap' not in run['options'] for run in manifest['runs']
                if run['script'] == 'egyptian')
 
@@ -182,3 +182,21 @@ def test_vertical_host_mode_is_reserved():
     from xsr.khitan.backend import KhitanBackend
     with pytest.raises(XSRError, match='XSR-WRITING-MODE-UNSUPPORTED'):
         KhitanBackend().prepare_options({'writing_mode': 'vertical'})
+
+@pytest.mark.parametrize(('value', 'expected'), [
+    ('normal', None), (None, None), (0.2, 0.2), (0, 0.0), ('0.35', 0.35),
+])
+def test_normal_spacing_and_explicit_legacy_gap(value, expected):
+    from xsr.khitan.backend import KhitanBackend
+    assert KhitanBackend._gap({'cluster_gap': value}) == expected
+    assert KhitanBackend._gap({}) is None
+
+
+def test_preprocess_gap_options_include_normal_and_overrides():
+    from xsr.khitan.backend import KhitanBackend
+    options = KhitanBackend.preprocess_extras([
+        r'\xsrKhitanText{𘬁 𘬂}',
+        r'\xsrKhitanClusterGap{0.35}\xsrKhitanText{𘬁 𘬂}',
+    ])
+    assert {} in options
+    assert {'cluster_gap': 0.35} in options

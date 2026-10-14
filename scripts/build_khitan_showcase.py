@@ -21,7 +21,7 @@ def khitan_runs(source):
 
 
 def prepare(renderer, responses, font, runs):
-    options = font_options(font.path) | {'cluster_gap': 0.2}
+    options = font_options(font.path)
     count = 0
     for text in sorted(runs):
         try:

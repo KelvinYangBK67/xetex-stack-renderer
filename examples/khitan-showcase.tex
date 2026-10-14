@@ -4,7 +4,7 @@
 \input{khitan-showcase-fonts.tex}
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{5pt}
-\newcommand\PageTitle[1]{\section*{XSR 0.10 | Khitan Small Script}\textbf{#1}\par\smallskip\hrule\medskip}
+\newcommand\PageTitle[1]{\section*{XSR \xsrPackageVersion\space | Khitan Small Script}\textbf{#1}\par\smallskip\hrule\medskip}
 \newcommand\Sample[2]{\par\noindent\makebox[41mm][l]{#1}\xsrKhitanText{#2}\par\medskip}
 \begin{document}
 \PageTitle{Type A: fixed order, original outlines}
@@ -33,8 +33,8 @@ is centered above the remaining paired rows. The filler itself has no outline.
 \Sample{Type B, 7 signs}{𘬁𖿤𘬂𘬃𘬁𘬂𘬃𘬁}
 \par\bigskip
 \textbf{SPACE versus ZERO WIDTH SPACE}\par
-The first pair uses a narrow XSR gap of 0.2 em. The second has no visible gap.
-Both are legal break opportunities between indivisible clusters.
+The first pair uses ordinary stretchable host-font word spacing.
+The second has no visible gap. Both allow breaks between indivisible clusters.
 \Sample{U+0020 SPACE}{𘬁𘬂 𘬁𘬂}
 \Sample{U+200B ZWSP}{𘬁𘬂​𘬁𘬂}
 \Sample{Iteration mark}{𘬀𘬁𘬂}
@@ -42,7 +42,7 @@ Both are legal break opportunities between indivisible clusters.
 \textit{U+18B00 is rendered as its own sign; semantic repetition is not duplicated graphically.}
 \newpage
 \PageTitle{Horizontal text and intrinsic line height}
-Each cluster is an upright atomic box aligned at the bottom of the text line.
+Each cluster is an upright atomic box centered at the host font's midline.
 Only a line containing a tall cluster requires extra vertical extent.
 \par\bigskip
 \noindent Line one: ordinary Latin text and normal spacing.\par
@@ -52,8 +52,8 @@ Only a line containing a tall cluster requires extra vertical extent.
 \noindent Line five: ordinary Latin text resumes.\par
 \bigskip
 A two-cluster run in a sentence: before \xsrKhitanText{𘬁𘬂 𘬁𘬂} after.
-The source SPACE becomes the narrow Khitan separator, while surrounding
-Latin spaces remain ordinary spaces.
+Both source SPACE and surrounding Latin spaces use ordinary host-font
+interword glue, including any active spaceskip setting.
 \par\medskip
 A zero-width boundary: before \xsrKhitanText{𘬁𘬂​𘬁𘬂} after.
 \vfill
