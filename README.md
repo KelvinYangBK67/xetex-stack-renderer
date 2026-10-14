@@ -1,6 +1,6 @@
 # xetex-stack-renderer
 
-XSR **1.2** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
+XSR **1.3** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
 frontend dispatches complete script runs to registered backends. Egyptian
 Hieroglyphs and Khitan Small Script have independent font-backed backends.
 Registered SVG/PNG/JPEG/PDF assets, direct SVG and optional external providers
@@ -375,12 +375,14 @@ metrics and XeTeX glyphs:
     \xsrKhitanText{𘬁𘬂 𘬁𘬂}
 
 The standalone detector groups consecutive KSS characters into one cluster.
-U+0020 SPACE ends a cluster and inserts a visible, breakable **0.2 em** gap
-between adjacent KSS clusters. U+200B ZERO WIDTH SPACE ends a cluster with a
-zero-width break opportunity. Spaces next to Latin or other scripts remain
-ordinary TeX spaces. The explicit command is useful when source tokenization
-is controlled by another package. The gap can be scoped with
-\xsrKhitanClusterGap{0.35}; Python callers use cluster_gap=0.35.
+U+0020 SPACE ends a cluster and inserts ordinary host-font **interword glue**
+(including any active `\spaceskip`), with natural stretch, shrink and line
+breaking. U+200B ZERO WIDTH SPACE ends a cluster with a zero-width break
+opportunity. Spaces next to Latin or other scripts also remain ordinary TeX
+spaces. The explicit command is useful when source tokenization is controlled
+by another package. To retain the former fixed-gap behavior for a passage, use
+`\xsrKhitanClusterGap{0.2}` or another em width such as 0.35; Python callers use
+`cluster_gap=0.2` / `cluster_gap=0.35`. The scoped value `normal` restores ordinary word spacing.
 
 U+16FE4 KHITAN SMALL SCRIPT FILLER occurs **once, immediately after the first
 sign** of a multi-sign cluster. Without it, Type A places pairs left/right
@@ -398,8 +400,9 @@ Layout uses the selected font's actual advances and ink bounds to center each
 original glyph in a fixed slot. Every glyph has scale 1: no Noto positional
 alternates, discretionary ligatures, compression, rotation, or glyph-specific
 coordinate tables are required. A two-column cluster is approximately two
-font ems wide. It is an indivisible, upright box with natural height, bottom
-aligned to the horizontal text baseline. The renderer enters the host paragraph
+font ems wide. It is an indivisible, upright box with natural height, centered vertically
+on the host font's 0.5em text center. Taller stacks extend both above and below
+the baseline. The renderer enters the host paragraph
 before its first atomic cluster, retaining alignment in centered paragraphs
 and table cells. A four-row cluster is at least four ems high and enlarges
 only its containing TeX line. Cluster geometry is independent of the host
@@ -734,7 +737,8 @@ commits. NewGardiner is fetched from its pinned official upstream revision; Sego
 optional on Windows. No external fonts are vendored. Noto can also be selected with `XSR_NOTO_FONT`; additional test
 fonts use `XSR_TEST_FONTS` (an `os.pathsep`-separated list).
 
-Current version evidence: [1.2 verification](docs/v1.2-verification.md) and
+Current version evidence: [1.3 verification](docs/v1.3-verification.md),
+[1.2 verification](docs/v1.2-verification.md) and
 [1.1 Unicode extraction](docs/v1.1-verification.md). Historical release
 records cover [0.10](docs/v0.10-verification.md),
 [0.9](docs/v0.9-verification.md), [0.8](docs/v0.8-verification.md),
