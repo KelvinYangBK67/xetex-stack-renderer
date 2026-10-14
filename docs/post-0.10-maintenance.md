@@ -1,6 +1,8 @@
-# Post-0.10 maintenance: issues #1 and #2
+# XSR 0.10 maintenance verification: issues #1 and #2
 
-Public release version remains 0.10. The starting commit is
+This is a historical record of work performed while the software version was
+0.10. For the current XSR 1.2 behavior, use the [README](../README.md).
+The starting commit was
 `c2dfb1e29fc985e449a0efbb19f9b65dac1a5fd3` (993 tests passed locally).
 
 ## Issue #1: preprocess artifacts
@@ -53,7 +55,8 @@ are unchanged. No image processing or PDF-content inspection is introduced.
 `INLINE_VERSION` and the vector/provider/asset TeX registrations now use
 `inline-0.10-optical-1`. This changes request and persistent response identities,
 so older geometry or response formats cannot be reused silently. Public package
-version remains 0.10; the restricted SVG importer and font backends are unchanged.
+version stayed at 0.10 for this maintenance update; the restricted SVG
+importer and font backends were unchanged.
 
 Additional tests cover policy defaults, scaled bias and additive compensation,
 unchanged vector geometry, metadata-only PNG/JPEG/PDF handling, measured TeX
@@ -78,9 +81,9 @@ spacing. The updated four-page inline showcase was rendered with Poppler and
 visually inspected. Regression PDFs remain untracked test outputs; only the
 intentionally updated inline showcase PDF/source is committed.
 
-Final full-suite and separate-integration results are reported at completion.
-The CI integration selection includes the new bundle tests. No public package
-version bump or dependency change was needed.
+The CI integration selection includes the new bundle tests. This maintenance
+record reports the focused local verification above; the historical full CI
+runs are available in the repository's GitHub Actions history.
 
 
 ## Shell bridge with -output-directory (0.10 maintenance)
