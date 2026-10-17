@@ -15,14 +15,14 @@ def register_script(registry: Registry) -> ScriptSpec:
     return registry.register('egyptian', EGYPTIAN_RANGES, suffixes=((0xFE00, 0xFE0F),))
 
 
-from .backend import (  # noqa: E402
+from .egyptian_backend import (  # noqa: E402
     BACKEND_VERSION,
     EgyptianBackend,
     serialize_tex_layout,
 )
-from .parser import EgyptianParseError, EgyptianParser  # noqa: E402
-from .layout import EgyptianLayout, EgyptianLayoutError  # noqa: E402
-from .model import EgyptianNode, GlyphPlacement, ParsedEgyptianRun, RenderResult  # noqa: E402
+from .egyptian_parser import EgyptianParseError, EgyptianParser  # noqa: E402
+from .egyptian_layout import EgyptianLayout, EgyptianLayoutError  # noqa: E402
+from .egyptian_model import EgyptianNode, GlyphPlacement, ParsedEgyptianRun, RenderResult  # noqa: E402
 
 __all__ = [
     'BACKEND_VERSION',

@@ -1,2 +1,2 @@
 """Compatibility import for Egyptian literal-source discovery."""
-from ..source import source_runs
+from ..egyptian_source import source_runs

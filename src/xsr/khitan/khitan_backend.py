@@ -8,8 +8,8 @@ from ..synthetic import FallbackFont, policy
 from ..vector import tofu, paths_tex
 from ..font_metrics import options_font, font_options, encode_path, tex_font_path
 from ..copy_text import attach_actual_text
-from .parser import KhitanParser
-from .layout import KhitanLayout
+from .khitan_parser import KhitanParser
+from .khitan_layout import KhitanLayout
 
 BACKEND_VERSION = 'native-fixed-stack-1.3'
 
@@ -23,7 +23,7 @@ class KhitanBackend:
     version = BACKEND_VERSION
 
     def __init__(self):
-        self.parser = KhitanParser()
+        self.khitan_parser = KhitanParser()
 
     @classmethod
     def preprocess_extras(cls, sources) -> list[dict[str, object]]:
@@ -72,7 +72,7 @@ class KhitanBackend:
         font = FallbackFont(options_font(options), policy(options))
         tex_font_path(font.path)
         gap = self._gap(options)
-        parsed = self.parser.parse(text)
+        parsed = self.khitan_parser.parse(text)
         layout = KhitanLayout(font)
         pieces = []
         for index, cluster in enumerate(parsed.clusters):
@@ -100,4 +100,4 @@ class KhitanBackend:
         digest = hashlib.sha256(text.encode('utf-8')).hexdigest()[:12]
         body = r'\xsrKhitanUseFont{' + encode_path(tex_font_path(font.path)) + '}{' + font.digest + '}{' + ''.join(pieces) + '}'
         return (r'\xsrBackendLayoutResult{khitan}{' + str(len(text)) + '}{' + digest +
-                '}{' + self.version + '}{xsr-native-' + self.parser.parser_version + '}{' + body + '}%\n')
+                '}{' + self.version + '}{xsr-native-' + self.khitan_parser.parser_version + '}{' + body + '}%\n')

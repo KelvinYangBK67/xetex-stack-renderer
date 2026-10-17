@@ -12,6 +12,6 @@ def register_script(registry: Registry) -> ScriptSpec:
     )
 
 
-from .backend import KhitanBackend  # noqa: E402
-from .parser import KhitanParser  # noqa: E402
-from .layout import KhitanLayout  # noqa: E402
+from .khitan_backend import KhitanBackend  # noqa: E402
+from .khitan_parser import KhitanParser  # noqa: E402
+from .khitan_layout import KhitanLayout  # noqa: E402

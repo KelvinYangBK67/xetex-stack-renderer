@@ -10,9 +10,9 @@ from ..vector import tofu, paths_tex
 from ..font_metrics import options_font, font_options, encode_path, tex_font_path
 from ..ink import matrix
 from ..copy_text import attach_actual_text
-from .parser import EgyptianParser
-from .model import RenderResult
-from .layout import EgyptianLayout
+from .egyptian_parser import EgyptianParser
+from .egyptian_model import RenderResult
+from .egyptian_layout import EgyptianLayout
 from .semantics import layout_options
 
 
@@ -56,7 +56,7 @@ class EgyptianBackend:
     version = BACKEND_VERSION
 
     def __init__(self, parser: EgyptianParser | None = None) -> None:
-        self.parser = parser or EgyptianParser()
+        self.egyptian_parser = parser or EgyptianParser()
 
     @staticmethod
     def preprocess_extras(sources) -> list[dict[str, object]]:
@@ -78,7 +78,7 @@ class EgyptianBackend:
         font = FallbackFont(options_font(options), policy(options))
         tex_font_path(font.path)
         direction=layout_options(options)
-        parsed = self.parser.parse(text)
+        parsed = self.egyptian_parser.parse(text)
         quadrats = EgyptianLayout(font,direction).quadrats(parsed)
         # Source slices correspond to atomic quadrats; no glyph-order inversion.
         layout_tex = r'\xsrEgyptianBreak{}'.join(
@@ -87,7 +87,7 @@ class EgyptianBackend:
         )
         layout_tex=r'\xsrEgyptianFlow{'+direction+'}{'+layout_tex+'}'
         digest = hashlib.sha256(text.encode('utf-8')).hexdigest()[:12]
-        parser = f'xsr-native-{self.parser.parser_version}'
+        parser = f'xsr-native-{self.egyptian_parser.parser_version}'
         body = (r'\xsrEgyptianUseFont'
                 f'{{{encode_path(tex_font_path(font.path))}}}{{{font.digest}}}'
                 f'{{{layout_tex}}}')
