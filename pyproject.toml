@@ -9,7 +9,7 @@ description = 'External renderer framework for Unicode-driven stacked scripts in
 readme = {text = 'XSR is a Unicode-driven stacked-script renderer for XeTeX, distributed as an IMPE component.', content-type = 'text/plain'}
 requires-python = '>=3.11'
 license = { text = 'MIT' }
-authors = [{ name = 'xetex-stack-renderer contributors' }]
+authors = [{ name = 'Sikai Yang' }]
 dependencies = ['fonttools>=4.50,<5', 'pillow>=10', 'pypdf>=6,<7']
 
 [project.optional-dependencies]
