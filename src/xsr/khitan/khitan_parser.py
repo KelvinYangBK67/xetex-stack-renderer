@@ -1,6 +1,6 @@
 """Unicode 18 Khitan cluster grammar. No font-specific shaping."""
 from ..errors import XSRError
-from .model import KhitanCluster, ParsedKhitanRun
+from .khitan_model import KhitanCluster, ParsedKhitanRun
 
 FILLER = 0x16FE4
 SEPARATORS = {0x20: 'space', 0x200B: 'zwsp'}

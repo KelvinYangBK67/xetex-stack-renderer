@@ -2,11 +2,11 @@
 from dataclasses import replace
 import pytest
 from xsr.egyptian import EgyptianParser
-from xsr.egyptian.layout import EgyptianLayout
-from xsr.egyptian.model import EgyptianNode, ParsedEgyptianRun
+from xsr.egyptian.egyptian_layout import EgyptianLayout
+from xsr.egyptian.egyptian_model import EgyptianNode, ParsedEgyptianRun
 from xsr.egyptian.semantics import rotation, validate_mirror, layout_options
 from xsr.egyptian.unicode_data import ROTATIONS, NO_MIRROR, NO_ROTATE
-from xsr.egyptian.source import source_runs
+from xsr.egyptian.egyptian_source import source_runs
 from xsr import build_default_registry
 from test_advanced_layout import text, contained, INSERTIONS
 

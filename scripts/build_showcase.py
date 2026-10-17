@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 
 from xsr import build_default_registry
-from xsr.egyptian.source import source_runs
+from xsr.egyptian.egyptian_source import source_runs
 from xsr.font_metrics import load_font, tex_font_path, font_options
 from xsr.renderer import default_renderer, request_digest
 from xsr.bundle import write_bundle

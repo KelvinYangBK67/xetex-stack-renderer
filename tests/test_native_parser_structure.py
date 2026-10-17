@@ -2,7 +2,7 @@
 from dataclasses import replace
 import pytest
 from xsr.egyptian import EgyptianParser, EgyptianParseError
-from xsr.egyptian.model import EgyptianNode
+from xsr.egyptian.egyptian_model import EgyptianNode
 
 A,B,C,D = 0x13000,0x13050,0x13153,0x133CF
 H,V,O,SB,SE = 0x13431,0x13430,0x13436,0x13437,0x13438

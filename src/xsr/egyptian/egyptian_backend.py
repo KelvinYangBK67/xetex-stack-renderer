@@ -10,9 +10,9 @@ from ..vector import tofu, paths_tex
 from ..font_metrics import options_font, font_options, encode_path, tex_font_path
 from ..ink import matrix
 from ..copy_text import attach_actual_text
-from .parser import EgyptianParser
-from .model import RenderResult
-from .layout import EgyptianLayout
+from .egyptian_parser import EgyptianParser
+from .egyptian_model import RenderResult
+from .egyptian_layout import EgyptianLayout
 from .semantics import layout_options
 
 

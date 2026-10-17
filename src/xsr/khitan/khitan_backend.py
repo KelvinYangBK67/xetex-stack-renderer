@@ -8,8 +8,8 @@ from ..synthetic import FallbackFont, policy
 from ..vector import tofu, paths_tex
 from ..font_metrics import options_font, font_options, encode_path, tex_font_path
 from ..copy_text import attach_actual_text
-from .parser import KhitanParser
-from .layout import KhitanLayout
+from .khitan_parser import KhitanParser
+from .khitan_layout import KhitanLayout
 
 BACKEND_VERSION = 'native-fixed-stack-1.3'
 

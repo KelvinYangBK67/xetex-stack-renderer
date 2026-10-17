@@ -7,8 +7,8 @@ complete expressions are separate quadrats. Joiners associate to the left.
 from __future__ import annotations
 from ..errors import XSRError
 from ..font_metrics import FontMetrics
-from .layout import EgyptianLayout
-from .model import EgyptianNode, ParsedEgyptianRun, RenderResult
+from .egyptian_layout import EgyptianLayout
+from .egyptian_model import EgyptianNode, ParsedEgyptianRun, RenderResult
 from .semantics import layout_options, rotation, validate_mirror
 
 PARSER_VERSION = '0.7'

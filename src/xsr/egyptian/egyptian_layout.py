@@ -5,7 +5,7 @@ from dataclasses import replace
 from ..errors import XSRError
 from ..ink import outline_bounds, insertion_region
 from ..font_metrics import FontMetrics
-from .model import Decoration, InsertionRegion, EgyptianNode, GlyphPlacement, ParsedEgyptianRun, RenderResult
+from .egyptian_model import Decoration, InsertionRegion, EgyptianNode, GlyphPlacement, ParsedEgyptianRun, RenderResult
 
 
 class EgyptianLayoutError(XSRError):

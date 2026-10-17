@@ -3,8 +3,8 @@ from xsr.errors import XSRError
 from xsr.font_metrics import load_font
 from xsr.synthetic import FallbackFont, XSRWarning
 from xsr.egyptian import EgyptianParser
-from xsr.egyptian.backend import EgyptianBackend
-from xsr.khitan.backend import KhitanBackend
+from xsr.egyptian.egyptian_backend import EgyptianBackend
+from xsr.khitan.khitan_backend import KhitanBackend
 from test_font_metrics import make_font
 
 

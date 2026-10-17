@@ -8,8 +8,8 @@ from xsr import build_default_registry
 from xsr.errors import XSRError
 from xsr.font_metrics import GlyphMetrics, load_font
 from xsr.khitan import KhitanParser, KhitanLayout
-from xsr.khitan.layout import slots
-from xsr.khitan.model import KhitanCluster
+from xsr.khitan.khitan_layout import slots
+from xsr.khitan.khitan_model import KhitanCluster
 
 A = chr(0x18B01)
 B = chr(0x18B02)
@@ -179,7 +179,7 @@ def test_preprocess_discovers_script_fonts_and_gap(tmp_path):
                if run['script'] == 'egyptian')
 
 def test_vertical_host_mode_is_reserved():
-    from xsr.khitan.backend import KhitanBackend
+    from xsr.khitan.khitan_backend import KhitanBackend
     with pytest.raises(XSRError, match='XSR-WRITING-MODE-UNSUPPORTED'):
         KhitanBackend().prepare_options({'writing_mode': 'vertical'})
 
@@ -187,13 +187,13 @@ def test_vertical_host_mode_is_reserved():
     ('normal', None), (None, None), (0.2, 0.2), (0, 0.0), ('0.35', 0.35),
 ])
 def test_normal_spacing_and_explicit_legacy_gap(value, expected):
-    from xsr.khitan.backend import KhitanBackend
+    from xsr.khitan.khitan_backend import KhitanBackend
     assert KhitanBackend._gap({'cluster_gap': value}) == expected
     assert KhitanBackend._gap({}) is None
 
 
 def test_preprocess_gap_options_include_normal_and_overrides():
-    from xsr.khitan.backend import KhitanBackend
+    from xsr.khitan.khitan_backend import KhitanBackend
     options = KhitanBackend.preprocess_extras([
         r'\xsrKhitanText{𘬁 𘬂}',
         r'\xsrKhitanClusterGap{0.35}\xsrKhitanText{𘬁 𘬂}',
