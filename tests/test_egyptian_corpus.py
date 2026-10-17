@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from xsr import build_default_registry
 from xsr.egyptian import EgyptianParser
-from xsr.egyptian.source import source_runs
+from xsr.egyptian.egyptian_source import source_runs
 
 ROOT = Path(__file__).resolve().parents[1]
 SHOWCASE = ROOT / 'examples/egyptian-showcase.tex'
