@@ -56,7 +56,7 @@ class EgyptianBackend:
     version = BACKEND_VERSION
 
     def __init__(self, parser: EgyptianParser | None = None) -> None:
-        self.egyptian_parser = parser or EgyptianParser()
+        self.parser = parser or EgyptianParser()
 
     @staticmethod
     def preprocess_extras(sources) -> list[dict[str, object]]:
@@ -78,7 +78,7 @@ class EgyptianBackend:
         font = FallbackFont(options_font(options), policy(options))
         tex_font_path(font.path)
         direction=layout_options(options)
-        parsed = self.egyptian_parser.parse(text)
+        parsed = self.parser.parse(text)
         quadrats = EgyptianLayout(font,direction).quadrats(parsed)
         # Source slices correspond to atomic quadrats; no glyph-order inversion.
         layout_tex = r'\xsrEgyptianBreak{}'.join(
@@ -87,7 +87,7 @@ class EgyptianBackend:
         )
         layout_tex=r'\xsrEgyptianFlow{'+direction+'}{'+layout_tex+'}'
         digest = hashlib.sha256(text.encode('utf-8')).hexdigest()[:12]
-        parser = f'xsr-native-{self.egyptian_parser.parser_version}'
+        parser = f'xsr-native-{self.parser.parser_version}'
         body = (r'\xsrEgyptianUseFont'
                 f'{{{encode_path(tex_font_path(font.path))}}}{{{font.digest}}}'
                 f'{{{layout_tex}}}')

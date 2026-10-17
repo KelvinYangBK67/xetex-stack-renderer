@@ -200,4 +200,4 @@ class EgyptianParser:
     def layout(self,text: str,font: FontMetrics,direction='ltr',
                writing_mode='horizontal') -> RenderResult:
         layout_options(dict(direction=direction,writing_mode=writing_mode))
-        return EgyptianLayout(font,direction).egyptian_layout(self.parse(text))
+        return EgyptianLayout(font,direction).layout(self.parse(text))

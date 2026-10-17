@@ -23,7 +23,7 @@ class KhitanBackend:
     version = BACKEND_VERSION
 
     def __init__(self):
-        self.khitan_parser = KhitanParser()
+        self.parser = KhitanParser()
 
     @classmethod
     def preprocess_extras(cls, sources) -> list[dict[str, object]]:
@@ -72,7 +72,7 @@ class KhitanBackend:
         font = FallbackFont(options_font(options), policy(options))
         tex_font_path(font.path)
         gap = self._gap(options)
-        parsed = self.khitan_parser.parse(text)
+        parsed = self.parser.parse(text)
         layout = KhitanLayout(font)
         pieces = []
         for index, cluster in enumerate(parsed.clusters):
@@ -100,4 +100,4 @@ class KhitanBackend:
         digest = hashlib.sha256(text.encode('utf-8')).hexdigest()[:12]
         body = r'\xsrKhitanUseFont{' + encode_path(tex_font_path(font.path)) + '}{' + font.digest + '}{' + ''.join(pieces) + '}'
         return (r'\xsrBackendLayoutResult{khitan}{' + str(len(text)) + '}{' + digest +
-                '}{' + self.version + '}{xsr-native-' + self.khitan_parser.parser_version + '}{' + body + '}%\n')
+                '}{' + self.version + '}{xsr-native-' + self.parser.parser_version + '}{' + body + '}%\n')
