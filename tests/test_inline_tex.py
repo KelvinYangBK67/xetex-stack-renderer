@@ -207,3 +207,13 @@ def test_old_policy_bundle_cannot_be_reused(tmp_path):
     write_bundle(tmp_path,'vector',{old:r'\typeout{OLD-POLICY-WAS-USED}'})
     output=compile_document(tmp_path,r'\Glyph{test}',r'\GlyphRegister{test}{glyph.png}',mode='preprocess',success=False)
     assert 'XSR-RESPONSE-MISSING' in output and 'OLD-POLICY-WAS-USED' not in output
+
+
+@pytest.mark.parametrize('scale',['1','1.2','1e-3','1e+3'])
+def test_l3regex_scale_accepts_exponents_without_range_warning(tmp_path,scale):
+    make_asset(tmp_path/'glyph.png')
+    output=compile_document(
+        tmp_path,box_body('scale='+scale),
+        r'\GlyphRegister{test}{glyph.png}')
+    assert 'Invalid end-point for range' not in output
+    assert 'LaTeX Error' not in output
