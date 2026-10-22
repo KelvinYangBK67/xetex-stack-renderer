@@ -151,7 +151,7 @@ def read_request(path: Path) -> RenderRequest:
 
 def parse_request_lines(lines: Sequence[str]) -> RenderRequest:
     if not lines or lines[0] != 'XSR2':
-        raise ValueError(f'invalid XSR2 request: {path}')
+        raise ValueError('invalid XSR2 request stream')
 
     fields: dict[str, str] = {}
     for line in lines[1:]:
