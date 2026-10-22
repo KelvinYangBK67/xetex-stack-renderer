@@ -240,8 +240,8 @@
   {
     \bool_if:NF \g_xsr_collect_open_bool
       {
-        \iow_open:Nx \g_xsr_collect_iow
-          {\c_sys_jobname_str.xsr-requests.req}
+        \tl_set:Nx \l_tmpa_tl {\c_sys_jobname_str.xsr-requests.req}
+        \iow_open:NV \g_xsr_collect_iow \l_tmpa_tl
         \bool_gset_true:N \g_xsr_collect_open_bool
       }
     \iow_now:Nn \g_xsr_collect_iow {XSR2}
