@@ -31,7 +31,7 @@
 \msg_new:nnn{xsr-inline}{stale}{[XSR-STALE]~Glyph~asset~changed;~regenerate~the~response.}
 \keys_define:nn{xsr/inline}
   {scale .code:n = {
-    \regex_match:nnF{\A[+]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?\Z}{#1}
+    \regex_match:nnF{\A[+]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][-+]?[0-9]+)?\Z}{#1}
       {\msg_fatal:nn{xsr-inline}{geometry}}
     \fp_set:Nn\l_xsr_inline_scale_fp{#1}
     \fp_compare:nF{0 < \l_xsr_inline_scale_fp < inf}{\msg_fatal:nn{xsr-inline}{geometry}}},

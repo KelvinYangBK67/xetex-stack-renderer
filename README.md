@@ -1,6 +1,6 @@
 # xetex-stack-renderer
 
-XSR **1.3** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
+XSR **1.4** is a Unicode-driven stack renderer for XeTeX/XeLaTeX. Its generic
 frontend dispatches complete script runs to registered backends. Egyptian
 Hieroglyphs and Khitan Small Script have independent font-backed backends.
 Registered SVG/PNG/JPEG/PDF assets, direct SVG and optional external providers
