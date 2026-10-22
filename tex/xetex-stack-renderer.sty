@@ -28,6 +28,10 @@
 
 \ProcessKeysOptions { xsr }
 
+% A host runner selects collect/preprocess before the source is loaded.
+\cs_if_exist:NT \XSRBuildModeOverride
+  {\tl_gset:Nx \g_xsr_mode_tl {\XSRBuildModeOverride}}
+
 % Standalone usage enables the replaceable active detector. Hosts may instead
 % load xsr-core plus a backend and call \xsr_dispatch_run:nn directly.
 \RequirePackage{xsr-detector-active}
