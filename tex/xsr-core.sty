@@ -36,6 +36,9 @@
 \tl_new:N \g_xsr_renderer_options_tl
 \bool_new:N \g_xsr_trace_bool
 \tl_gset:Nn \g_xsr_mode_tl { auto }
+% Used only by the outer build runner; package-level selection still works.
+\cs_if_exist:NT \XSRBuildModeOverride
+  {\tl_gset:Nx \g_xsr_mode_tl {\XSRBuildModeOverride}}
 \tl_gset:Nn \g_xsr_renderer_command_tl { python~-m~xsr.renderer }
 \tl_gclear:N \g_xsr_cache_dir_tl
 \tl_gset:Nx \g_xsr_renderer_options_tl
@@ -228,9 +231,41 @@
      {\xsr_execute_response:}
      {\msg_fatal:nnx{xsr}{digest-missing}{\l_xsr_request_digest_tl}}}
 
+
+% Capture TeX-resolved requests as a document-level stream.  No renderer is
+% executed in this phase, and the transport is ASCII even for Unicode paths.
+\iow_new:N \g_xsr_collect_iow
+\bool_new:N \g_xsr_collect_open_bool
+\cs_new_protected:Npn \xsr_collect_request:n #1
+  {
+    \bool_if:NF \g_xsr_collect_open_bool
+      {
+        \iow_open:Nx \g_xsr_collect_iow
+          {\c_sys_jobname_str.xsr-requests.req}
+        \bool_gset_true:N \g_xsr_collect_open_bool
+      }
+    \iow_now:Nn \g_xsr_collect_iow {XSR2}
+    \iow_now:Nx \g_xsr_collect_iow {digest=\l_xsr_request_digest_tl}
+    \iow_now:Nn \g_xsr_collect_iow {script=#1}
+    \iow_now:Nx \g_xsr_collect_iow {backend_version=\l_xsr_backend_version_tl}
+    \iow_now:Nx \g_xsr_collect_iow {options=\g_xsr_renderer_options_tl}
+    \iow_now:Nx \g_xsr_collect_iow {codepoints=\l_xsr_codepoints_tl}
+    \iow_now:Nn \g_xsr_collect_iow {END}
+    % An approximate inline advance preserves paragraph building.  Final
+    % geometry is owned entirely by the normal preprocessed render pass.
+    \mode_leave_vertical:
+    \hbox{\kern 1em}
+  }
+\AddToHook{enddocument/afterlastpage}
+  {\bool_if:NT \g_xsr_collect_open_bool
+     {\iow_close:N \g_xsr_collect_iow}}
+
 % Backend-facing interface: identity is unchanged; transport is mode-specific.
 \cs_new_protected:Npn \xsr_external_render:nn #1#2
   {\xsr_prepare_request:nn{#1}{#2}
+   \str_if_eq:VnTF\g_xsr_mode_tl{collect}
+     {\xsr_collect_request:n{#1}}
+     {
    \str_if_eq:VnT\g_xsr_mode_tl{auto}{\xsr_load_bundle:}
    \str_if_eq:VnTF\g_xsr_mode_tl{stub}
      {\xsr_unavailable_stub:nn{#1}{#2}}
@@ -238,7 +273,7 @@
        {\xsr_execute_response:}
        {\str_if_eq:VnTF\g_xsr_mode_tl{preprocess}
          {\xsr_preprocessed_or_stub:nn{#1}{#2}}
-         {\xsr_shell_render:nn{#1}{#2}}}}}
+         {\xsr_shell_render:nn{#1}{#2}}}}}}
 
 % Stable response command emitted by successful Python backends.
 \cs_new_protected:Npn \xsr_backend_result:nnnnn #1#2#3#4#5
