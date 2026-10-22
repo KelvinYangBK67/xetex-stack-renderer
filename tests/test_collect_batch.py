@@ -20,7 +20,8 @@ def test_request_collection_rejects_partial_stream(tmp_path):
 
 
 @pytest.mark.skipif(shutil.which("xelatex") is None, reason="XeLaTeX unavailable")
-def test_collect_batch_and_final_without_shell(tmp_path):
+def test_collect_batch_and_final_without_shell(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     asset = make_asset(tmp_path / "字形.png")
     source = tmp_path / "main.tex"
     source.write_text(
