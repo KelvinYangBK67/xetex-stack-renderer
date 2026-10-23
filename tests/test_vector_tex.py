@@ -156,3 +156,14 @@ def test_scoped_policy_and_unicode_provider(tmp_path, mode):
     assert 'XSR-GLYPH-MISSING' in output and 'XSR-PROVIDER-MISSING' in output
     calls = [json.loads(line) for line in (tmp_path/'calls.jsonl').read_text().splitlines()]
     assert [c['glyph'] for c in calls] == ['字形', 'missing']
+
+
+
+@pytest.mark.parametrize('mode', ['shell','preprocess'])
+def test_kage_scoped_style_after_escaped_brace(tmp_path, mode):
+    config(tmp_path)
+    body = r'{\xsrKageStyle{sans}A\}B\xsrKageGlyph{same}} \xsrKageGlyph{same}'
+    compile_document(tmp_path, body, r'\xsrKageProvider{provider.json}',
+                     mode=mode, prepare=mode=='preprocess')
+    calls = [json.loads(line) for line in (tmp_path/'calls.jsonl').read_text().splitlines()]
+    assert [call['style'] for call in calls] == ['sans','serif']
