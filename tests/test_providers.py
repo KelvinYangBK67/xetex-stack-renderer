@@ -110,3 +110,20 @@ def test_preprocess_included_scoped_provider_styles(tmp_path):
     main(['preprocess','--input',str(source),'--output-dir',str(tmp_path)])
     calls = [json.loads(line) for line in (tmp_path/'calls.jsonl').read_text().splitlines()]
     assert [call['style'] for call in calls] == ['sans','serif']
+
+
+
+def test_preprocess_scoped_style_survives_escaped_right_brace(tmp_path):
+    from xsr.renderer import main
+    config(tmp_path)
+    source = tmp_path/'escaped.tex'
+    source.write_text(
+        r'\xsrKageProvider{provider.json}'
+        r'{\xsrKageStyle{sans}A\}B\xsrKageGlyph{same}}'
+        r'\xsrKageGlyph{same}', encoding='utf-8')
+    assert main(['preprocess','--input',str(source),'--output-dir',str(tmp_path)]) == 0
+    runs = json.loads((tmp_path/'.xsr/escaped.manifest.json').read_text())['runs']
+    assert [run['options']['style'] for run in runs] == ['sans','serif']
+    assert len({run['digest'] for run in runs}) == 2
+    calls = [json.loads(line) for line in (tmp_path/'calls.jsonl').read_text().splitlines()]
+    assert [call['style'] for call in calls] == ['sans','serif']
