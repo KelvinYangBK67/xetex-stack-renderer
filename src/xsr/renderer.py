@@ -146,9 +146,12 @@ def default_renderer(cache_dir: str | Path | None = None) -> Renderer:
 
 
 def read_request(path: Path) -> RenderRequest:
-    lines = path.read_text(encoding='utf-8').splitlines()
+    return parse_request_lines(path.read_text(encoding='utf-8').splitlines())
+
+
+def parse_request_lines(lines: Sequence[str]) -> RenderRequest:
     if not lines or lines[0] != 'XSR2':
-        raise ValueError(f'invalid XSR2 request: {path}')
+        raise ValueError('invalid XSR2 request stream')
 
     fields: dict[str, str] = {}
     for line in lines[1:]:
@@ -238,6 +241,61 @@ def preprocess(args: argparse.Namespace) -> int:
     return prepare_sources(args)
 
 
+
+def read_request_collection(path: Path) -> list[RenderRequest]:
+    """Read the single ASCII stream emitted by the no-shell TeX collect pass.
+
+    A missing file means the document made no XSR requests; malformed/truncated
+    streams fail rather than producing a seemingly valid partial bundle.
+    """
+    if not path.exists():
+        return []
+    requests: list[RenderRequest] = []
+    current: list[str] = []
+    for line in path.read_text(encoding='utf-8').splitlines():
+        if not current:
+            if line != 'XSR2':
+                raise ValueError('invalid collected XSR request stream header')
+            current.append(line)
+        elif line == 'END':
+            requests.append(parse_request_lines(current))
+            current = []
+        else:
+            current.append(line)
+    if current:
+        raise ValueError('truncated collected XSR request stream')
+    return requests
+
+
+def render_batch(args: argparse.Namespace) -> int:
+    """Render actual TeX-resolved requests into an atomic response bundle."""
+    from .bundle import write_bundle, atomic_text
+    requests = read_request_collection(args.input)
+    renderer = default_renderer(args.cache_dir)
+    responses: dict[str, str] = {}
+    manifest = []
+    for req in requests:
+        version = renderer.backend_version(req.script)
+        if req.backend_version != version:
+            raise ValueError(
+                f'backend version mismatch for {req.script}: '
+                f'{req.backend_version!r} != {version!r}'
+            )
+        if req.digest not in responses:
+            responses[req.digest] = renderer.render(
+                req.script, req.text, req.options
+            )
+        manifest.append({'digest': req.digest, 'script': req.script,
+                         'codepoints': [f'{ord(ch):X}' for ch in req.text]})
+    target = args.output_dir.resolve()
+    target.mkdir(parents=True, exist_ok=True)
+    write_bundle(target, args.jobname, responses)
+    atomic_text(target / '.xsr' / (args.jobname + '.manifest.json'),
+                json.dumps({'format': 'XSR-COLLECT-1', 'runs': manifest},
+                           ensure_ascii=False, indent=2) + '\n')
+    return 0
+
+
 def cleanup_shell(args):
     from .bundle import bundle_path
     bundle_path(args.jobname)  # Validate a single filename stem, never a path.
@@ -261,6 +319,15 @@ def build_parser() -> argparse.ArgumentParser:
     cleanup_parser = subparsers.add_parser('cleanup', help='remove the shell bridge scratch pair')
     cleanup_parser.add_argument('--jobname', required=True)
     cleanup_parser.set_defaults(func=cleanup_shell)
+
+    batch_parser = subparsers.add_parser(
+        'batch', help='render TeX-collected requests into a response bundle'
+    )
+    batch_parser.add_argument('--input', type=Path, required=True)
+    batch_parser.add_argument('--output-dir', type=Path, required=True)
+    batch_parser.add_argument('--jobname', required=True)
+    batch_parser.add_argument('--cache-dir', type=Path)
+    batch_parser.set_defaults(func=render_batch)
 
     preprocess_parser = subparsers.add_parser(
         'preprocess', help='prepare content-addressed responses before XeLaTeX'
