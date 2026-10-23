@@ -4,7 +4,7 @@ import re
 from .errors import XSRError
 from .source_traversal import entrypoints, resolve_include
 
-TOKEN = re.compile(r'\\xsrMissingGlyphPolicy\s*\{([^{}]*)\}|\\(?:input|include)\s*\{([^{}]+)\}|[{}]')
+TOKEN = re.compile(r'\\xsrMissingGlyphPolicy\s*\{([^{}]*)\}|\\(?:input|include)\s*\{([^{}]+)\}|\\\\|\\[{}]|[{}]')
 
 
 def policy_spans(sources):
@@ -29,7 +29,7 @@ def policy_spans(sources):
                 visit(resolve_include(sources, path, token[2]))
             elif token.group() == '{':
                 stack.append(state)
-            elif stack:
+            elif token.group() == '}' and stack:
                 state = stack.pop()
         result[path].append((cursor, len(source)+1, state))
 

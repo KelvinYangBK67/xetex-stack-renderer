@@ -65,3 +65,16 @@ def test_font_run_included_under_each_policy(tmp_path):
     runs=json.loads((tmp_path / '.xsr/main.manifest.json').read_text())['runs']
     assert {r['options'].get('missing_glyph_policy','box') for r in runs}=={'box','error'}
     assert len({r['digest'] for r in runs})==2
+
+
+
+def test_policy_scope_survives_escaped_right_brace(tmp_path):
+    source = tmp_path/'escaped.tex'
+    glyph = chr(0x13000)
+    text = r'{\xsrMissingGlyphPolicy{error}A\}B' + glyph + '}' + glyph
+    source.write_text(text, encoding='utf-8')
+    spans = policy_spans(discover_sources([source]))[source]
+    first = text.index(glyph)
+    second = text.index(glyph, first + 1)
+    assert {state for start, end, state in spans if start <= first < end} == {'error'}
+    assert {state for start, end, state in spans if start <= second < end} == {'box'}

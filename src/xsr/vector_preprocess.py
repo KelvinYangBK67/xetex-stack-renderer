@@ -13,7 +13,8 @@ INCLUDE = re.compile(r'\\(?:input|include)\s*\{([^{}]+)\}')
 REGISTER = re.compile(r'\\GlyphRegister\s*\{([^{}]*)\}\s*\{([^{}]*)\}')
 USE = re.compile(r'\\Glyph\s*(?:\[([^]]*)\])?\s*\{([^{}]*)\}')
 INLINE_COMMAND = re.compile(REGISTER.pattern + '|' + USE.pattern)
-TOKEN = re.compile(COMMAND.pattern + '|' + INLINE_COMMAND.pattern + '|' + INCLUDE.pattern + r'|[{}]')
+# Consume escaped braces and paired backslashes before recognizing group delimiters.
+TOKEN = re.compile(COMMAND.pattern + '|' + INLINE_COMMAND.pattern + '|' + INCLUDE.pattern + r'|\\\\|\\[{}]|[{}]')
 
 
 def prepare_vectors(sources, workdir, bundle, renderer, responses):
@@ -30,6 +31,8 @@ def prepare_vectors(sources, workdir, bundle, renderer, responses):
         source = sources[path][1]
         for token in TOKEN.finditer(source):
             value = token.group()
+            if value in (r'\\', r'\{', r'\}'):
+                continue
             if value == '{':
                 stack.append(dict(state))
                 continue
